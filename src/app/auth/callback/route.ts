@@ -20,6 +20,18 @@ function safeInternalPath(next: string | null, origin: string): string {
   return next;
 }
 
+function redirectWithDbg(
+  origin: string,
+  path: string,
+  dbg: string,
+  extra: Record<string, string> = {},
+) {
+  const url = new URL(path.startsWith("http") ? path : `${origin}${path}`);
+  url.searchParams.set("rv_dbg", dbg);
+  for (const [k, v] of Object.entries(extra)) url.searchParams.set(k, v);
+  return NextResponse.redirect(url.toString());
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
@@ -27,21 +39,26 @@ export async function GET(request: Request) {
   let cookieSetCount = 0;
   const cookieNames: string[] = [];
 
-  const withDbg = (path: string, dbg: string, extra: Record<string, string> = {}) => {
-    const url = new URL(path.startsWith("http") ? path : `${origin}${path}`);
-    url.searchParams.set("rv_dbg", dbg);
-    for (const [k, v] of Object.entries(extra)) url.searchParams.set(k, v);
-    return NextResponse.redirect(url.toString());
-  };
-
   if (!code) {
     // #region agent log
-    console.log(JSON.stringify({ sessionId: "337fe7", hypothesisId: "A", location: "callback/route.ts:no-code", message: "oauth callback missing code", data: {}, timestamp: Date.now() }));
+    console.log(
+      JSON.stringify({
+        sessionId: "337fe7",
+        hypothesisId: "A",
+        location: "callback/route.ts:no-code",
+        message: "oauth callback missing code",
+        data: {},
+        timestamp: Date.now(),
+      }),
+    );
     // #endregion
-    return withDbg("/giris", "no_code", { error: "auth" });
+    return redirectWithDbg(origin, "/giris", "no_code", { error: "auth" });
   }
 
-  let forward = NextResponse.redirect(`${origin}${next}`);
+  const successUrl = new URL(`${origin}${next}`);
+  successUrl.searchParams.set("rv_dbg", "exchange_ok");
+  let forward = NextResponse.redirect(successUrl.toString());
+
   const cookieStore = await cookies();
   const supabase = createServerClient(getSupabaseUrl(), getSupabasePublishableKey(), {
     cookies: {
@@ -51,7 +68,9 @@ export async function GET(request: Request) {
       setAll(cookiesToSet) {
         cookieSetCount = cookiesToSet.length;
         cookieNames.push(...cookiesToSet.map((c) => c.name));
-        forward = NextResponse.redirect(`${origin}${next}`);
+        forward = NextResponse.redirect(successUrl.toString());
+        successUrl.searchParams.set("rv_ck", String(cookiesToSet.length));
+        forward = NextResponse.redirect(successUrl.toString());
         cookiesToSet.forEach(({ name, value, options }) => {
           cookieStore.set(name, value, options);
           forward.cookies.set(name, value, options);
@@ -78,23 +97,20 @@ export async function GET(request: Request) {
     }),
   );
   // #endregion
+
   if (error) {
-    return withDbg("/giris", "exchange_fail", {
+    return redirectWithDbg(origin, "/giris", "exchange_fail", {
       error: "auth",
       rv_err: error.message.slice(0, 80),
       rv_ck: String(cookieSetCount),
     });
   }
 
-  const sep = next.includes("?") ? "&" : "?";
-  forward = NextResponse.redirect(
-    `${origin}${next}${sep}rv_dbg=exchange_ok&rv_ck=${cookieSetCount}`,
-  );
-  // Re-apply cookies onto the final redirect (setAll may have run earlier)
-  for (const c of cookieStore.getAll()) {
-    if (c.name.includes("auth-token") || c.name.startsWith("sb-")) {
-      forward.cookies.set(c.name, c.value);
-    }
+  successUrl.searchParams.set("rv_ck", String(cookieSetCount));
+  // Ensure final Location carries dbg even if setAll never ran
+  if (cookieSetCount === 0) {
+    forward = NextResponse.redirect(successUrl.toString());
   }
+
   return forward;
 }
