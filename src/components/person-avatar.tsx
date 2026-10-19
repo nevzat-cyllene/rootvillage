@@ -11,6 +11,24 @@ const sizes: Record<Size, string> = {
   lg: "h-16 w-16",
 };
 
+function genderTone(gender: Person["gender"], inverted?: boolean) {
+  if (inverted) {
+    if (gender === "female") return "bg-[#E8D4D8]/25 ring-[#E8D4D8]/45";
+    if (gender === "male") return "bg-[#D8E0E8]/25 ring-[#D8E0E8]/45";
+    return "bg-white/15 ring-white/20";
+  }
+  if (gender === "female") return "bg-[var(--gender-female-bg)] ring-[var(--gender-female)]/35";
+  if (gender === "male") return "bg-[var(--gender-male-bg)] ring-[var(--gender-male)]/35";
+  return "bg-accent-soft ring-border-soft";
+}
+
+function glyphColor(gender: Person["gender"], inverted?: boolean) {
+  if (inverted) return "rgba(255,255,255,0.92)";
+  if (gender === "female") return "var(--gender-female)";
+  if (gender === "male") return "var(--gender-male)";
+  return "#5B6B7C";
+}
+
 export function PersonAvatar({
   person,
   gender,
@@ -24,7 +42,6 @@ export function PersonAvatar({
   avatarUrl?: string | null;
   size?: Size;
   className?: string;
-  /** For dark focus cards */
   inverted?: boolean;
 }) {
   const g = gender ?? person?.gender ?? null;
@@ -39,7 +56,10 @@ export function PersonAvatar({
         alt={name}
         className={cn(
           sizes[size],
-          "shrink-0 rounded-full object-cover ring-1 ring-border-soft",
+          "shrink-0 rounded-full object-cover ring-2",
+          g === "female" && "ring-[var(--gender-female)]/40",
+          g === "male" && "ring-[var(--gender-male)]/40",
+          (!g || (g !== "female" && g !== "male")) && "ring-border-soft",
           className,
         )}
       />
@@ -50,45 +70,58 @@ export function PersonAvatar({
     <span
       className={cn(
         sizes[size],
-        "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full",
-        inverted ? "bg-white/15 ring-1 ring-white/20" : "bg-accent-soft ring-1 ring-border-soft",
+        "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ring-2",
+        genderTone(g, inverted),
         className,
       )}
       aria-hidden
     >
-      <Silhouette gender={g} inverted={inverted} />
+      <Silhouette gender={g} color={glyphColor(g, inverted)} />
     </span>
   );
 }
 
 function Silhouette({
   gender,
-  inverted,
+  color,
 }: {
   gender: Person["gender"];
-  inverted?: boolean;
+  color: string;
 }) {
-  const fill = inverted ? "rgba(255,255,255,0.88)" : "#5B6B7C";
-  // Female: slightly softer head+shoulders; male: broader shoulders; neutral default
   if (gender === "female") {
     return (
-      <svg viewBox="0 0 64 64" className="h-[72%] w-[72%]" fill={fill}>
-        <circle cx="32" cy="24" r="12" />
-        <path d="M12 58c2-14 10-20 20-20s18 6 20 20v2H12v-2Z" />
-        <path d="M22 18c0-2 3-6 10-6s10 4 10 6" fill="none" stroke={fill} strokeWidth="2" opacity="0.35" />
+      <svg viewBox="0 0 64 64" className="h-[78%] w-[78%]" fill={color}>
+        <circle cx="32" cy="22" r="11" />
+        <path d="M14 56c2-12 9-18 18-18s16 6 18 18v3H14v-3Z" />
+        <circle cx="48" cy="14" r="5.5" fill="none" stroke={color} strokeWidth="2.2" />
+        <path
+          d="M48 19.5v8M44.5 24h7"
+          stroke={color}
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        />
       </svg>
     );
   }
   if (gender === "male") {
     return (
-      <svg viewBox="0 0 64 64" className="h-[72%] w-[72%]" fill={fill}>
-        <circle cx="32" cy="22" r="11" />
-        <path d="M8 58c3-15 12-22 24-22s21 7 24 22v2H8v-2Z" />
+      <svg viewBox="0 0 64 64" className="h-[78%] w-[78%]" fill={color}>
+        <circle cx="30" cy="23" r="11" />
+        <path d="M8 56c3-14 11-20 22-20s19 6 22 20v3H8v-3Z" />
+        <circle cx="46" cy="16" r="5.5" fill="none" stroke={color} strokeWidth="2.2" />
+        <path
+          d="M50 12l7-7M50.5 5h7v7"
+          fill="none"
+          stroke={color}
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     );
   }
   return (
-    <svg viewBox="0 0 64 64" className="h-[72%] w-[72%]" fill={fill}>
+    <svg viewBox="0 0 64 64" className="h-[72%] w-[72%]" fill={color}>
       <circle cx="32" cy="23" r="11.5" />
       <path d="M10 58c2.5-14 11-21 22-21s19.5 7 22 21v2H10v-2Z" />
     </svg>

@@ -107,6 +107,14 @@ export function PersonRelationStudio({
     () => (focusId ? linksForPerson(focusId, people, relations) : null),
     [focusId, people, relations],
   );
+  const primarySpouseId = links?.spouses[0]?.id ?? null;
+  const spouseLinks = useMemo(
+    () =>
+      primarySpouseId
+        ? linksForPerson(primarySpouseId, people, relations)
+        : null,
+    [primarySpouseId, people, relations],
+  );
 
   useEffect(() => {
     setPulse(true);
@@ -116,7 +124,6 @@ export function PersonRelationStudio({
 
   useEffect(() => {
     setEditOpen(false);
-    setAddRole(null);
     setError(null);
   }, [focusId]);
 
@@ -303,19 +310,22 @@ export function PersonRelationStudio({
   const spouseLeft = focus ? spouseOnLeft(focus) : false;
   const primarySpouse = links?.spouses[0] ?? null;
   const extraSpouses = links?.spouses.slice(1) ?? [];
+  const focusSiblings = links?.siblings ?? [];
+  const spouseSiblings = spouseLinks?.siblings ?? [];
+  const focusFanSide: "left" | "right" = spouseLeft ? "right" : "left";
 
   return (
     <section className="mb-10 animate-fade-up">
       <div className="mb-4">
         <h2 className="text-[20px] font-semibold tracking-[-0.03em]">İlişki haritası</h2>
         <p className="mt-1 text-[13px] text-text-secondary">
-          Üstte ebeveynler, ortada kişi ve eşi, altta çocuklar. Birine basınca aynı düzen o kişi için
-          sürer.
+          Üstte odak kişinin ebeveynleri, ortada çift ve yanlarında kardeş fan’ı, altta çocuklar.
+          Eşe tıklayınca odak değişir.
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-[20px] border border-border-soft bg-[linear-gradient(165deg,#f7f8fa_0%,#eef1f4_48%,#fafafa_100%)] p-4 sm:p-6">
-        {/* Parents */}
+      <div className="overflow-x-auto overflow-y-hidden rounded-[20px] border border-border-soft bg-[linear-gradient(165deg,#f7f8fa_0%,#eef1f4_48%,#fafafa_100%)] p-4 sm:p-6">
+        {/* Parents of focus only */}
         <TreeBand label="Ebeveynler">
           {(links?.parents ?? []).map((p) => (
             <PersonChip key={p.id} person={p} onSelect={() => setFocusId(p.id)} />
@@ -325,39 +335,82 @@ export function PersonRelationStudio({
 
         <Connector />
 
-        {/* Focus + spouse */}
         <div className="mb-1 text-center text-[10px] font-medium uppercase tracking-[0.08em] text-text-secondary">
           Kişi ve eş
         </div>
-        <div
-          className={cn(
-            "mx-auto flex max-w-lg flex-wrap items-center justify-center gap-3",
-            spouseLeft && "flex-row-reverse",
-          )}
-        >
-          {focus && (
-            <FocusCard
-              person={focus}
-              pulse={pulse}
-              onEdit={openEdit}
-              detailHref={`/person/${focus.id}`}
+
+        <div className="mx-auto flex w-max max-w-none items-center justify-center gap-1 px-2 sm:gap-2">
+          {focusFanSide === "left" && (
+            <SiblingFan
+              side="left"
+              siblings={focusSiblings}
+              onSelect={setFocusId}
+              onAdd={() => openAdd("sibling")}
             />
           )}
-          {primarySpouse ? (
-            <PersonChip
-              person={primarySpouse}
-              onSelect={() => setFocusId(primarySpouse.id)}
-              large
-              tone="spouse"
+          {spouseLeft && primarySpouse && (
+            <SiblingFan
+              side="left"
+              siblings={spouseSiblings}
+              onSelect={setFocusId}
+              onAdd={() => {
+                setFocusId(primarySpouse.id);
+                openAdd("sibling");
+              }}
             />
-          ) : (
-            <AddChip label="+ Eş" onClick={() => openAdd("spouse")} large />
+          )}
+
+          <div
+            className={cn(
+              "relative z-10 flex items-stretch gap-3",
+              spouseLeft && "flex-row-reverse",
+            )}
+          >
+            {focus && (
+              <HeroPersonCard
+                person={focus}
+                variant="focus"
+                pulse={pulse}
+                onEdit={openEdit}
+                detailHref={`/person/${focus.id}`}
+              />
+            )}
+            {primarySpouse ? (
+              <HeroPersonCard
+                person={primarySpouse}
+                variant="partner"
+                onSelect={() => setFocusId(primarySpouse.id)}
+              />
+            ) : (
+              <AddChip label="+ Eş" onClick={() => openAdd("spouse")} large />
+            )}
+          </div>
+
+          {!spouseLeft && primarySpouse && (
+            <SiblingFan
+              side="right"
+              siblings={spouseSiblings}
+              onSelect={setFocusId}
+              onAdd={() => {
+                setFocusId(primarySpouse.id);
+                openAdd("sibling");
+              }}
+            />
+          )}
+          {focusFanSide === "right" && (
+            <SiblingFan
+              side="right"
+              siblings={focusSiblings}
+              onSelect={setFocusId}
+              onAdd={() => openAdd("sibling")}
+            />
           )}
         </div>
+
         {extraSpouses.length > 0 && (
-          <div className="mt-2 flex flex-wrap justify-center gap-2">
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
             {extraSpouses.map((p) => (
-              <PersonChip key={p.id} person={p} onSelect={() => setFocusId(p.id)} tone="spouse" />
+              <PersonChip key={p.id} person={p} onSelect={() => setFocusId(p.id)} />
             ))}
           </div>
         )}
@@ -367,19 +420,8 @@ export function PersonRelationStudio({
           </div>
         )}
 
-        {/* Siblings */}
-        <div className="mt-5">
-          <TreeBand label="Kardeşler">
-            {(links?.siblings ?? []).map((p) => (
-              <PersonChip key={p.id} person={p} onSelect={() => setFocusId(p.id)} />
-            ))}
-            <AddChip label="+ Kardeş" onClick={() => openAdd("sibling")} />
-          </TreeBand>
-        </div>
-
         <Connector />
 
-        {/* Children */}
         <TreeBand label="Çocuklar">
           {(links?.children ?? []).map((p) => (
             <PersonChip key={p.id} person={p} onSelect={() => setFocusId(p.id)} />
@@ -387,7 +429,6 @@ export function PersonRelationStudio({
           <AddChip label="+ Çocuk" onClick={() => openAdd("child")} />
         </TreeBand>
 
-        {/* Quick jump strip */}
         <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
           {people.map((p) => (
             <button
@@ -457,49 +498,139 @@ function Connector() {
   return <div className="mx-auto my-3 h-5 w-px bg-gradient-to-b from-border to-steel/50" aria-hidden />;
 }
 
-function FocusCard({
+function HeroPersonCard({
   person,
+  variant,
   pulse,
   onEdit,
+  onSelect,
   detailHref,
 }: {
   person: Person;
-  pulse: boolean;
-  onEdit: () => void;
-  detailHref: string;
+  variant: "focus" | "partner";
+  pulse?: boolean;
+  onEdit?: () => void;
+  onSelect?: () => void;
+  detailHref?: string;
 }) {
-  return (
-    <div
-      className={cn(
-        "relative w-[168px] rounded-[18px] border border-text bg-text px-3 py-3.5 text-center text-white shadow-[0_12px_36px_rgba(29,29,31,0.22)] transition-transform duration-300",
-        pulse && "scale-[1.03]",
-      )}
-    >
+  const isFocus = variant === "focus";
+  const genderRing =
+    person.gender === "female"
+      ? "ring-[var(--gender-female)]/40"
+      : person.gender === "male"
+        ? "ring-[var(--gender-male)]/40"
+        : "ring-border-soft";
+
+  const inner = (
+    <>
       <div className="mb-2 flex justify-center">
-        <PersonAvatar person={person} size="lg" inverted />
+        <PersonAvatar person={person} size="lg" inverted={isFocus} />
       </div>
       <p className="text-[14px] font-semibold tracking-[-0.02em]">{person.full_name}</p>
-      <p className="mt-1 text-[11px] text-white/65">
+      <p className={cn("mt-1 text-[11px]", isFocus ? "text-white/65" : "text-text-secondary")}>
         {formatYearRange(person.birth_year, person.death_year)}
       </p>
       {person.gender && (
-        <p className="mt-0.5 text-[10px] text-white/50">{genderLabel(person.gender)}</p>
+        <p className={cn("mt-0.5 text-[10px]", isFocus ? "text-white/50" : "text-text-tertiary")}>
+          {genderLabel(person.gender)}
+        </p>
       )}
-      <div className="mt-2.5 flex justify-center gap-2">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium hover:bg-white/25"
-        >
-          Düzenle
-        </button>
-        <Link
-          href={detailHref}
-          className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium hover:bg-white/20"
-        >
-          Sayfa
-        </Link>
+      {isFocus && onEdit && detailHref && (
+        <div className="mt-2.5 flex justify-center gap-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium hover:bg-white/25"
+          >
+            Düzenle
+          </button>
+          <Link
+            href={detailHref}
+            onClick={(e) => e.stopPropagation()}
+            className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium hover:bg-white/20"
+          >
+            Sayfa
+          </Link>
+        </div>
+      )}
+      {!isFocus && (
+        <p className="mt-2 text-[10px] font-medium text-text-tertiary">Odaklamak için dokun</p>
+      )}
+    </>
+  );
+
+  if (isFocus) {
+    return (
+      <div
+        className={cn(
+          "relative w-[168px] rounded-[18px] border border-text bg-text px-3 py-3.5 text-center text-white shadow-[0_12px_36px_rgba(29,29,31,0.22)] transition-transform duration-300",
+          pulse && "scale-[1.03]",
+        )}
+      >
+        {inner}
       </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "pressable relative w-[168px] rounded-[18px] border border-border-soft bg-bg-surface px-3 py-3.5 text-center shadow-[0_10px_32px_rgba(0,0,0,0.08)] ring-2 transition-transform",
+        genderRing,
+      )}
+    >
+      {inner}
+    </button>
+  );
+}
+
+function SiblingFan({
+  side,
+  siblings,
+  onSelect,
+  onAdd,
+}: {
+  side: "left" | "right";
+  siblings: Person[];
+  onSelect: (id: string) => void;
+  onAdd: () => void;
+}) {
+  const visible = siblings.slice(0, 4);
+  const rest = siblings.length - visible.length;
+
+  return (
+    <div className="sibling-fan" data-side={side}>
+      {visible.map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          className="sibling-fan-item pressable w-[108px] shrink-0 rounded-[14px] border border-border-soft bg-bg-surface/95 px-2 py-2 text-center shadow-[var(--shadow)]"
+          onClick={() => onSelect(p.id)}
+          title={p.full_name}
+        >
+          <div className="mb-1 flex justify-center">
+            <PersonAvatar person={p} size="sm" />
+          </div>
+          <p className="truncate text-[11px] font-semibold tracking-[-0.02em]">{p.full_name}</p>
+        </button>
+      ))}
+      {rest > 0 && (
+        <span className="sibling-fan-item rounded-full bg-bg-elevated px-2 py-1 text-[10px] font-medium text-text-secondary">
+          +{rest}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={onAdd}
+        className="sibling-fan-item pressable shrink-0 rounded-[12px] border border-dashed border-border bg-white/80 px-2 py-3 text-[10px] font-medium text-text-secondary hover:text-text"
+      >
+        +
+      </button>
     </div>
   );
 }

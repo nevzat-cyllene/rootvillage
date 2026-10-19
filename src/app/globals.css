@@ -14,6 +14,10 @@
   --steel: #a1a1a6;
   --danger: #c4413a;
   --success: #2d6a4f;
+  --gender-male: #5b6b7c;
+  --gender-male-bg: #d8e0e8;
+  --gender-female: #8b6b73;
+  --gender-female-bg: #ede4e6;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.04);
   --radius: 14px;
   --radius-sm: 10px;
@@ -174,4 +178,94 @@ html.atlas-immersive main {
   max-width: none;
   padding: 0 !important;
   margin: 0;
+}
+
+/* Sibling perspective fan */
+.sibling-fan {
+  display: flex;
+  align-items: center;
+  position: relative;
+  min-height: 168px;
+  padding-inline: 4px;
+}
+
+.sibling-fan[data-side="left"] {
+  flex-direction: row;
+  margin-right: -8px;
+}
+
+.sibling-fan[data-side="right"] {
+  flex-direction: row-reverse;
+  margin-left: -8px;
+}
+
+.sibling-fan-item {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease;
+  transform-origin: center center;
+}
+
+.sibling-fan[data-side="left"] .sibling-fan-item:nth-child(1) {
+  transform: translateX(28px) scale(0.92);
+  z-index: 3;
+}
+.sibling-fan[data-side="left"] .sibling-fan-item:nth-child(2) {
+  transform: translateX(14px) scale(0.82);
+  z-index: 2;
+  opacity: 0.92;
+}
+.sibling-fan[data-side="left"] .sibling-fan-item:nth-child(3) {
+  transform: translateX(0) scale(0.72);
+  z-index: 1;
+  opacity: 0.82;
+}
+.sibling-fan[data-side="left"] .sibling-fan-item:nth-child(4) {
+  transform: translateX(-10px) scale(0.64);
+  z-index: 0;
+  opacity: 0.7;
+}
+
+.sibling-fan[data-side="right"] .sibling-fan-item:nth-child(1) {
+  transform: translateX(-28px) scale(0.92);
+  z-index: 3;
+}
+.sibling-fan[data-side="right"] .sibling-fan-item:nth-child(2) {
+  transform: translateX(-14px) scale(0.82);
+  z-index: 2;
+  opacity: 0.92;
+}
+.sibling-fan[data-side="right"] .sibling-fan-item:nth-child(3) {
+  transform: translateX(0) scale(0.72);
+  z-index: 1;
+  opacity: 0.82;
+}
+.sibling-fan[data-side="right"] .sibling-fan-item:nth-child(4) {
+  transform: translateX(10px) scale(0.64);
+  z-index: 0;
+  opacity: 0.7;
+}
+
+.sibling-fan[data-side="left"]:hover .sibling-fan-item:nth-child(1),
+.sibling-fan[data-side="left"]:focus-within .sibling-fan-item:nth-child(1) {
+  transform: translateX(36px) scale(0.96);
+}
+.sibling-fan[data-side="left"]:hover .sibling-fan-item:nth-child(2),
+.sibling-fan[data-side="left"]:focus-within .sibling-fan-item:nth-child(2) {
+  transform: translateX(8px) scale(0.86);
+}
+.sibling-fan[data-side="left"]:hover .sibling-fan-item:nth-child(3),
+.sibling-fan[data-side="left"]:focus-within .sibling-fan-item:nth-child(3) {
+  transform: translateX(-16px) scale(0.76);
+}
+
+.sibling-fan[data-side="right"]:hover .sibling-fan-item:nth-child(1),
+.sibling-fan[data-side="right"]:focus-within .sibling-fan-item:nth-child(1) {
+  transform: translateX(-36px) scale(0.96);
+}
+.sibling-fan[data-side="right"]:hover .sibling-fan-item:nth-child(2),
+.sibling-fan[data-side="right"]:focus-within .sibling-fan-item:nth-child(2) {
+  transform: translateX(-8px) scale(0.86);
+}
+.sibling-fan[data-side="right"]:hover .sibling-fan-item:nth-child(3),
+.sibling-fan[data-side="right"]:focus-within .sibling-fan-item:nth-child(3) {
+  transform: translateX(16px) scale(0.76);
 }
