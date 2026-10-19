@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #fafafa;
+  --bg-elevated: #f5f5f7;
+  --bg-surface: #ffffff;
+  --text: #1d1d1f;
+  --text-secondary: #86868b;
+  --text-tertiary: #6e6e73;
+  --border: #d2d2d7;
+  --border-soft: #e8e8ed;
+  --accent: #5b6b7c;
+  --accent-soft: #e8ecf0;
+  --steel: #a1a1a6;
+  --danger: #c4413a;
+  --success: #2d6a4f;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.04);
+  --radius: 14px;
+  --radius-sm: 10px;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-surface: var(--bg-surface);
+  --color-text: var(--text);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-steel: var(--steel);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(91, 107, 124, 0.08), transparent 60%),
+    linear-gradient(180deg, #fafafa 0%, #f5f5f7 100%);
+  color: var(--text);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(91, 107, 124, 0.18);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.35s ease both;
+}
+
+.stagger > * {
+  animation: fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.stagger > *:nth-child(1) {
+  animation-delay: 0.02s;
+}
+.stagger > *:nth-child(2) {
+  animation-delay: 0.06s;
+}
+.stagger > *:nth-child(3) {
+  animation-delay: 0.1s;
+}
+.stagger > *:nth-child(4) {
+  animation-delay: 0.14s;
+}
+.stagger > *:nth-child(5) {
+  animation-delay: 0.18s;
+}
+.stagger > *:nth-child(6) {
+  animation-delay: 0.22s;
+}
+.stagger > *:nth-child(7) {
+  animation-delay: 0.26s;
+}
+.stagger > *:nth-child(8) {
+  animation-delay: 0.3s;
+}
+
+.pressable {
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.pressable:active {
+  transform: scale(0.98);
+}
+
+.titanium-surface {
+  background: linear-gradient(180deg, #ffffff 0%, #f7f7f8 100%);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow);
+}
+
+.steel-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+}

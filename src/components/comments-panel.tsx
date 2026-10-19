@@ -1,0 +1,221 @@
+"use client";
+
+import { useAuth } from "@/components/auth-provider";
+import { Button, EmptyState, Input, Surface, Textarea } from "@/components/ui";
+import { createClient } from "@/lib/supabase/client";
+import type { Comment, CommentTarget } from "@/lib/types";
+import { relativeTime } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+export function CommentsPanel({
+  targetType,
+  targetId,
+  initialComments,
+}: {
+  targetType: CommentTarget;
+  targetId: string;
+  initialComments: Comment[];
+}) {
+  const { user, requireAuth } = useAuth();
+  const router = useRouter();
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const ok = await requireAuth();
+    if (!ok) return;
+    if (!body.trim()) return;
+
+    setBusy(true);
+    setError(null);
+    const supabase = createClient();
+    const {
+      data: { user: u },
+    } = await supabase.auth.getUser();
+    if (!u) {
+      setBusy(false);
+      return;
+    }
+
+    const { error: err } = await supabase.from("comments").insert({
+      target_type: targetType,
+      target_id: targetId,
+      body: body.trim(),
+      author_id: u.id,
+    });
+
+    setBusy(false);
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    setBody("");
+    router.refresh();
+  }
+
+  return (
+    <section className="mt-10 animate-fade-up">
+      <div className="mb-4 flex items-end justify-between gap-3">
+        <div>
+          <h2 className="text-[20px] font-semibold tracking-[-0.03em]">Yorumlar & anılar</h2>
+          <p className="mt-1 text-[13px] text-text-secondary">
+            Bilgi doğru mu? Bu dönemde ne olmuş? Kısa not bırak.
+          </p>
+        </div>
+      </div>
+
+      <Surface className="mb-4">
+        <form onSubmit={(e) => void submit(e)} className="space-y-3">
+          <Textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder={
+              user
+                ? "Örn: Bu aile 1950’lerde X mahallesinde otururdu…"
+                : "Yorum yazmak için Google ile giriş yapacaksın"
+            }
+          />
+          {error && <p className="text-[13px] text-danger">{error}</p>}
+          <div className="flex justify-end">
+            <Button type="submit" disabled={busy || !body.trim()}>
+              {user ? "Yorum ekle" : "Giriş yap & yorumla"}
+            </Button>
+          </div>
+        </form>
+      </Surface>
+
+      {initialComments.length === 0 ? (
+        <EmptyState
+          title="Henüz yorum yok"
+          description="İlk anıyı veya düzeltmeyi sen bırak — sonraki nesiller için iz kalır."
+        />
+      ) : (
+        <ul className="stagger space-y-3">
+          {initialComments.map((c) => (
+            <li key={c.id} className="rounded-[14px] border border-border-soft bg-bg-surface px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[13px] font-medium">
+                  {c.author?.display_name ?? "Üye"}
+                </p>
+                <p className="text-[12px] text-text-secondary">{relativeTime(c.created_at)}</p>
+              </div>
+              <p className="mt-2 whitespace-pre-wrap text-[14px] leading-relaxed text-text">
+                {c.body}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+export function DisputeToggle({
+  table,
+  id,
+  disputed,
+}: {
+  table: "families" | "people";
+  id: string;
+  disputed: boolean;
+}) {
+  const { requireAuth } = useAuth();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  async function toggle() {
+    const ok = await requireAuth();
+    if (!ok) return;
+    setBusy(true);
+    const supabase = createClient();
+    await supabase.from(table).update({ disputed: !disputed }).eq("id", id);
+    setBusy(false);
+    router.refresh();
+  }
+
+  return (
+    <Button variant={disputed ? "danger" : "secondary"} disabled={busy} onClick={() => void toggle()}>
+      {disputed ? "Tartışmalı işaretini kaldır" : "Bilgi tartışmalı"}
+    </Button>
+  );
+}
+
+export function SoftDeleteButton({
+  table,
+  id,
+  label = "Kaldır (öneri)",
+}: {
+  table: "villages" | "families" | "people";
+  id: string;
+  label?: string;
+}) {
+  const { user, profile, requireAuth } = useAuth();
+  const router = useRouter();
+  const [reason, setReason] = useState("");
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function run() {
+    const ok = await requireAuth();
+    if (!ok) return;
+
+    setBusy(true);
+    const supabase = createClient();
+    const {
+      data: { user: u },
+    } = await supabase.auth.getUser();
+    if (!u) {
+      setBusy(false);
+      return;
+    }
+
+    // Admins soft-delete immediately; members create a proposal
+    if (profile?.role === "admin") {
+      await supabase
+        .from(table)
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", id);
+    } else {
+      await supabase.from("edit_proposals").insert({
+        target_type: table === "villages" ? "village" : table === "families" ? "family" : "person",
+        target_id: id,
+        action: "delete",
+        reason: reason.trim() || "Silme önerisi",
+        proposed_by: u.id,
+      });
+    }
+
+    setBusy(false);
+    setOpen(false);
+    router.refresh();
+  }
+
+  if (!open) {
+    return (
+      <Button variant="ghost" onClick={() => void (user ? setOpen(true) : requireAuth())}>
+        {label}
+      </Button>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-[12px] border border-border-soft bg-bg-elevated p-3">
+      <Input
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Neden kaldırılmalı?"
+      />
+      <div className="flex gap-2">
+        <Button variant="danger" disabled={busy} onClick={() => void run()}>
+          {profile?.role === "admin" ? "Sil" : "Öneri gönder"}
+        </Button>
+        <Button variant="ghost" onClick={() => setOpen(false)}>
+          Vazgeç
+        </Button>
+      </div>
+    </div>
+  );
+}
