@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui";
 import { useAuth } from "@/components/auth-provider";
@@ -16,6 +17,33 @@ export function SiteHeader() {
 
   const avatarUrl = profile?.avatar_url ?? user?.user_metadata?.avatar_url ?? null;
   const initial = (displayName ?? "?").slice(0, 1).toUpperCase();
+
+  // #region agent log
+  useEffect(() => {
+    fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "337fe7",
+      },
+      body: JSON.stringify({
+        sessionId: "337fe7",
+        hypothesisId: "E",
+        location: "site-header.tsx:effect",
+        message: "header auth state",
+        data: {
+          loading,
+          hasUser: !!user,
+          displayName: displayName ? "set" : null,
+          pathname,
+          showing: loading ? "loading" : user ? "profile" : "giris-link",
+        },
+        timestamp: Date.now(),
+        runId: "pre-fix",
+      }),
+    }).catch(() => {});
+  }, [loading, user, displayName, pathname]);
+  // #endregion
 
   return (
     <header className="sticky top-0 z-40 border-b border-border-soft/80 bg-[#fafafa]/80 backdrop-blur-xl supports-[backdrop-filter]:bg-[#fafafa]/75">
