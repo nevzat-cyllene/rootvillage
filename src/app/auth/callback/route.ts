@@ -1,10 +1,11 @@
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase/env";
 
 function safeInternalPath(next: string | null, origin: string): string {
   if (!next) return "/villages";
 
-  // Absolute URL → only allow same origin; strip to path+search+hash
   if (next.startsWith("http://") || next.startsWith("https://")) {
     try {
       const url = new URL(next);
@@ -15,7 +16,6 @@ function safeInternalPath(next: string | null, origin: string): string {
     }
   }
 
-  // Relative path only (block protocol-relative //evil.com)
   if (!next.startsWith("/") || next.startsWith("//")) return "/villages";
   return next;
 }
@@ -24,14 +24,31 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const next = safeInternalPath(searchParams.get("next"), origin);
+  const forward = NextResponse.redirect(`${origin}${next}`);
 
-  if (code) {
-    const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
-    }
+  if (!code) {
+    return NextResponse.redirect(`${origin}/giris?error=auth`);
   }
 
-  return NextResponse.redirect(`${origin}/villages?auth=error`);
+  const cookieStore = await cookies();
+  const supabase = createServerClient(getSupabaseUrl(), getSupabasePublishableKey(), {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          cookieStore.set(name, value, options);
+          forward.cookies.set(name, value, options);
+        });
+      },
+    },
+  });
+
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) {
+    return NextResponse.redirect(`${origin}/giris?error=auth`);
+  }
+
+  return forward;
 }

@@ -16,12 +16,55 @@ type AuthContextValue = {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
-  signInWithGoogle: (redirectTo?: string) => Promise<void>;
+  signInWithGoogle: (redirectTo?: string) => Promise<{ error?: string }>;
+  signInWithPassword: (
+    email: string,
+    password: string,
+  ) => Promise<{ error?: string }>;
+  signUpWithPassword: (input: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+  }) => Promise<{ error?: string; needsConfirm?: boolean }>;
   signOut: () => Promise<void>;
   requireAuth: (redirectTo?: string) => Promise<boolean>;
+  displayName: string | null;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function resolveNextPath(redirectTo?: string): string {
+  let nextPath = "/villages";
+  if (redirectTo) {
+    try {
+      const u = redirectTo.startsWith("http")
+        ? new URL(redirectTo)
+        : new URL(redirectTo, window.location.origin);
+      if (u.origin === window.location.origin) {
+        nextPath = `${u.pathname}${u.search}${u.hash}` || "/villages";
+      }
+    } catch {
+      /* default */
+    }
+  } else if (typeof window !== "undefined") {
+    nextPath = `${window.location.pathname}${window.location.search}` || "/villages";
+  }
+  return nextPath;
+}
+
+function nameFromUser(user: User | null): string | null {
+  if (!user) return null;
+  const meta = user.user_metadata ?? {};
+  const full =
+    meta.full_name ||
+    meta.name ||
+    [meta.first_name, meta.last_name].filter(Boolean).join(" ").trim() ||
+    meta.given_name;
+  if (typeof full === "string" && full.trim()) return full.trim();
+  if (user.email) return user.email.split("@")[0] ?? user.email;
+  return "Üye";
+}
 
 export function AuthProvider({
   children,
@@ -50,12 +93,15 @@ export function AuthProvider({
     const supabase = createClient();
     let mounted = true;
 
-    supabase.auth.getUser().then(({ data }) => {
+    void (async () => {
+      const { data } = await supabase.auth.getSession();
       if (!mounted) return;
-      setUser(data.user);
+      const sessionUser = data.session?.user ?? null;
+      setUser(sessionUser);
       setLoading(false);
-      if (data.user) void refreshProfile(data.user.id);
-    });
+      if (sessionUser) void refreshProfile(sessionUser.id);
+      else setProfile(null);
+    })();
 
     const {
       data: { subscription },
@@ -74,42 +120,61 @@ export function AuthProvider({
 
   const signInWithGoogle = useCallback(async (redirectTo?: string) => {
     const supabase = createClient();
-    // Google OAuth = giriş + ilk kez ise otomatik kayıt (ayrı signup yok).
-    // next her zaman aynı origin içinde kalsın (başka Vercel app'e kaçmasın).
-    let nextPath = "/villages";
-    if (redirectTo) {
-      try {
-        const u = redirectTo.startsWith("http")
-          ? new URL(redirectTo)
-          : new URL(redirectTo, window.location.origin);
-        if (u.origin === window.location.origin) {
-          nextPath = `${u.pathname}${u.search}${u.hash}` || "/villages";
-        }
-      } catch {
-        /* keep default */
-      }
-    } else {
-      nextPath = `${window.location.pathname}${window.location.search}` || "/villages";
-    }
-
+    const nextPath = resolveNextPath(redirectTo);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
-        queryParams: {
-          prompt: "select_account",
-        },
+        queryParams: { prompt: "select_account" },
       },
     });
-    if (error) {
-      const hint =
-        error.message.toLowerCase().includes("provider") ||
-        error.message.toLowerCase().includes("not enabled")
-          ? "Supabase’te Google girişi henüz açık değil. Dashboard → Authentication → Providers → Google."
-          : error.message;
-      window.alert(hint);
-    }
+    return error ? { error: error.message } : {};
   }, []);
+
+  const signInWithPassword = useCallback(async (email: string, password: string) => {
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error: error.message };
+    if (data.user) {
+      setUser(data.user);
+      void refreshProfile(data.user.id);
+    }
+    return {};
+  }, [refreshProfile]);
+
+  const signUpWithPassword = useCallback(
+    async (input: {
+      email: string;
+      password: string;
+      firstName: string;
+      lastName: string;
+    }) => {
+      const supabase = createClient();
+      const fullName = `${input.firstName.trim()} ${input.lastName.trim()}`.trim();
+      const { data, error } = await supabase.auth.signUp({
+        email: input.email.trim(),
+        password: input.password,
+        options: {
+          data: {
+            full_name: fullName,
+            first_name: input.firstName.trim(),
+            last_name: input.lastName.trim(),
+            name: fullName,
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/villages`,
+        },
+      });
+      if (error) return { error: error.message };
+      if (data.session?.user) {
+        setUser(data.session.user);
+        void refreshProfile(data.session.user.id);
+        return {};
+      }
+      // Email confirmation açık olabilir
+      return { needsConfirm: true };
+    },
+    [refreshProfile],
+  );
 
   const signOut = useCallback(async () => {
     const supabase = createClient();
@@ -121,30 +186,39 @@ export function AuthProvider({
   const requireAuth = useCallback(
     async (redirectTo?: string) => {
       if (user) return true;
-      let nextPath = "/villages";
-      if (redirectTo) {
-        try {
-          const u = redirectTo.startsWith("http")
-            ? new URL(redirectTo)
-            : new URL(redirectTo, window.location.origin);
-          if (u.origin === window.location.origin) {
-            nextPath = `${u.pathname}${u.search}${u.hash}` || "/villages";
-          }
-        } catch {
-          /* default */
-        }
-      } else {
-        nextPath = `${window.location.pathname}${window.location.search}` || "/villages";
-      }
+      const nextPath = resolveNextPath(redirectTo);
       window.location.assign(`/giris?next=${encodeURIComponent(nextPath)}`);
       return false;
     },
     [user],
   );
 
+  const displayName =
+    profile?.display_name?.trim() || nameFromUser(user);
+
   const value = useMemo(
-    () => ({ user, profile, loading, signInWithGoogle, signOut, requireAuth }),
-    [user, profile, loading, signInWithGoogle, signOut, requireAuth],
+    () => ({
+      user,
+      profile,
+      loading,
+      signInWithGoogle,
+      signInWithPassword,
+      signUpWithPassword,
+      signOut,
+      requireAuth,
+      displayName,
+    }),
+    [
+      user,
+      profile,
+      loading,
+      signInWithGoogle,
+      signInWithPassword,
+      signUpWithPassword,
+      signOut,
+      requireAuth,
+      displayName,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

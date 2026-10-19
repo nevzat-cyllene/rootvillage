@@ -7,12 +7,15 @@ import { Button } from "@/components/ui";
 import { useAuth } from "@/components/auth-provider";
 
 export function SiteHeader() {
-  const { user, profile, signOut, loading } = useAuth();
+  const { user, profile, displayName, signOut, loading } = useAuth();
   const pathname = usePathname();
   const girisHref =
     pathname && pathname !== "/giris"
       ? `/giris?next=${encodeURIComponent(pathname)}`
       : "/giris";
+
+  const avatarUrl = profile?.avatar_url ?? user?.user_metadata?.avatar_url ?? null;
+  const initial = (displayName ?? "?").slice(0, 1).toUpperCase();
 
   return (
     <header className="sticky top-0 z-40 border-b border-border-soft/80 bg-[#fafafa]/80 backdrop-blur-xl supports-[backdrop-filter]:bg-[#fafafa]/75">
@@ -35,24 +38,44 @@ export function SiteHeader() {
               Yönetim
             </Link>
           )}
-          {!loading &&
-            (user ? (
-              <div className="flex items-center gap-2 pl-1">
-                <span className="hidden max-w-[140px] truncate text-[13px] text-text-secondary sm:inline">
-                  {profile?.display_name ?? "Üye"}
+          {loading ? (
+            <span className="px-3 text-[12px] text-text-tertiary">…</span>
+          ) : user ? (
+            <div className="flex items-center gap-2 pl-1">
+              <div className="flex items-center gap-2 rounded-full border border-border-soft bg-bg-surface py-1 pl-1 pr-2.5">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrl as string}
+                    alt=""
+                    className="h-7 w-7 rounded-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-soft text-[12px] font-semibold text-accent">
+                    {initial}
+                  </span>
+                )}
+                <span className="hidden max-w-[140px] truncate text-[13px] font-medium text-text sm:inline">
+                  {displayName}
                 </span>
-                <Button variant="ghost" className="!px-3 !py-1.5 text-[13px]" onClick={() => void signOut()}>
-                  Çıkış
-                </Button>
               </div>
-            ) : (
-              <Link
-                href={girisHref}
-                className="pressable inline-flex items-center justify-center rounded-full border border-border-soft bg-bg-surface px-3.5 py-1.5 text-[13px] font-medium text-text titanium-surface hover:border-border"
+              <Button
+                variant="ghost"
+                className="!px-3 !py-1.5 text-[13px]"
+                onClick={() => void signOut().then(() => window.location.assign("/"))}
               >
-                Giriş
-              </Link>
-            ))}
+                Çıkış
+              </Button>
+            </div>
+          ) : (
+            <Link
+              href={girisHref}
+              className="pressable inline-flex items-center justify-center rounded-full border border-border-soft bg-bg-surface px-3.5 py-1.5 text-[13px] font-medium text-text titanium-surface hover:border-border"
+            >
+              Giriş
+            </Link>
+          )}
         </nav>
       </div>
     </header>

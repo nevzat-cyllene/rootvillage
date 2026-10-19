@@ -115,8 +115,25 @@ begin
   insert into public.profiles (id, display_name, avatar_url)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', new.email),
-    new.raw_user_meta_data->>'avatar_url'
+    coalesce(
+      nullif(new.raw_user_meta_data->>'full_name', ''),
+      nullif(new.raw_user_meta_data->>'name', ''),
+      nullif(
+        trim(
+          concat_ws(
+            ' ',
+            new.raw_user_meta_data->>'first_name',
+            new.raw_user_meta_data->>'last_name'
+          )
+        ),
+        ''
+      ),
+      new.email
+    ),
+    coalesce(
+      new.raw_user_meta_data->>'avatar_url',
+      new.raw_user_meta_data->>'picture'
+    )
   )
   on conflict (id) do update set
     display_name = excluded.display_name,
