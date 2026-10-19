@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Logo } from "@/components/logo";
 import { Button, Input } from "@/components/ui";
 import { useAuth } from "@/components/auth-provider";
+import { useLocale } from "@/lib/locale";
 import { cn } from "@/lib/utils";
 
 function GoogleMark() {
@@ -41,6 +42,7 @@ function AuthForm() {
     signInWithPassword,
     signUpWithPassword,
   } = useAuth();
+  const { t } = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") || "/villages";
@@ -138,10 +140,10 @@ function AuthForm() {
         <div className="mb-6 flex rounded-full bg-bg-elevated p-1">
           {(
             [
-              ["login", "Giriş yap"],
-              ["register", "Kayıt ol"],
+              ["login", "auth.loginTab"],
+              ["register", "auth.registerTab"],
             ] as const
-          ).map(([key, label]) => (
+          ).map(([key, labelKey]) => (
             <button
               key={key}
               type="button"
@@ -156,13 +158,13 @@ function AuthForm() {
                   : "text-text-secondary hover:text-text",
               )}
             >
-              {label}
+              {t(labelKey)}
             </button>
           ))}
         </div>
 
         <h1 className="text-[24px] font-semibold tracking-[-0.035em]">
-          {mode === "login" ? "Hesabına giriş yap" : "Hesap oluştur"}
+          {mode === "login" ? t("auth.loginTitle") : t("auth.registerTitle")}
         </h1>
 
         <form onSubmit={(e) => void onSubmit(e)} className="mt-6 space-y-3">
@@ -171,7 +173,7 @@ function AuthForm() {
               <Input
                 name="firstName"
                 autoComplete="given-name"
-                placeholder="Ad"
+                placeholder={t("auth.firstName")}
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 required
@@ -179,7 +181,7 @@ function AuthForm() {
               <Input
                 name="lastName"
                 autoComplete="family-name"
-                placeholder="Soyad"
+                placeholder={t("auth.lastName")}
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 required
@@ -190,7 +192,7 @@ function AuthForm() {
             type="email"
             name="email"
             autoComplete="email"
-            placeholder="E-posta"
+            placeholder={t("auth.email")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -199,7 +201,7 @@ function AuthForm() {
             type="password"
             name="password"
             autoComplete={mode === "login" ? "current-password" : "new-password"}
-            placeholder="Şifre"
+            placeholder={t("auth.password")}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -210,7 +212,7 @@ function AuthForm() {
               type="password"
               name="confirm"
               autoComplete="new-password"
-              placeholder="Şifre tekrar"
+              placeholder={t("auth.confirm")}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               required
@@ -225,13 +227,13 @@ function AuthForm() {
           )}
 
           <Button type="submit" className="!w-full !py-3" disabled={busy}>
-            {mode === "login" ? "Giriş yap" : "Kayıt ol"}
+            {mode === "login" ? t("auth.submitLogin") : t("auth.submitRegister")}
           </Button>
         </form>
 
         <div className="my-5 flex items-center gap-3">
           <div className="h-px flex-1 bg-border-soft" />
-          <span className="text-[12px] text-text-tertiary">veya</span>
+          <span className="text-[12px] text-text-tertiary">{t("auth.or")}</span>
           <div className="h-px flex-1 bg-border-soft" />
         </div>
 
@@ -243,13 +245,13 @@ function AuthForm() {
           onClick={() => void onGoogle()}
         >
           <GoogleMark />
-          Google ile devam et
+          {t("auth.google")}
         </Button>
       </div>
 
       <p className="relative mt-5 text-center text-[13px] text-text-secondary">
         <Link href="/villages" className="hover:text-text hover:underline">
-          Köylere göz at
+          {t("auth.browse")}
         </Link>
       </p>
     </div>

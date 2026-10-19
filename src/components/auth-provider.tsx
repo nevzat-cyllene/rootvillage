@@ -27,6 +27,7 @@ type AuthContextValue = {
     firstName: string;
     lastName: string;
   }) => Promise<{ error?: string; needsConfirm?: boolean }>;
+  updateDisplayName: (name: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   requireAuth: (redirectTo?: string) => Promise<boolean>;
   displayName: string | null;
@@ -94,48 +95,9 @@ export function AuthProvider({
     let mounted = true;
 
     void (async () => {
-      const { data, error } = await supabase.auth.getSession();
+      const { data } = await supabase.auth.getSession();
       if (!mounted) return;
       const sessionUser = data.session?.user ?? null;
-      // #region agent log
-      const cookieNames =
-        typeof document !== "undefined"
-          ? document.cookie
-              .split(";")
-              .map((c) => c.trim().split("=")[0])
-              .filter((n) => n.includes("sb-") || n.includes("auth"))
-          : [];
-      const params =
-        typeof window !== "undefined"
-          ? Object.fromEntries(new URLSearchParams(window.location.search).entries())
-          : {};
-      fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "337fe7",
-        },
-        body: JSON.stringify({
-          sessionId: "337fe7",
-          hypothesisId: "C,D",
-          location: "auth-provider.tsx:getSession",
-          message: "client getSession after mount",
-          data: {
-            hasUser: !!sessionUser,
-            hasSession: !!data.session,
-            sessionErr: error?.message?.slice(0, 100) ?? null,
-            cookieNames,
-            rv_dbg: params.rv_dbg ?? null,
-            rv_ck: params.rv_ck ?? null,
-            rv_err: params.rv_err ?? null,
-            path: typeof window !== "undefined" ? window.location.pathname : null,
-            initialUserWas: !!initialUser,
-          },
-          timestamp: Date.now(),
-          runId: "pre-fix",
-        }),
-      }).catch(() => {});
-      // #endregion
       setUser(sessionUser);
       setLoading(false);
       if (sessionUser) void refreshProfile(sessionUser.id);
@@ -144,25 +106,7 @@ export function AuthProvider({
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      // #region agent log
-      fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "337fe7",
-        },
-        body: JSON.stringify({
-          sessionId: "337fe7",
-          hypothesisId: "D",
-          location: "auth-provider.tsx:onAuthStateChange",
-          message: "auth state change",
-          data: { event, hasUser: !!session?.user },
-          timestamp: Date.now(),
-          runId: "pre-fix",
-        }),
-      }).catch(() => {});
-      // #endregion
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) void refreshProfile(session.user.id);
       else setProfile(null);
@@ -173,7 +117,7 @@ export function AuthProvider({
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [refreshProfile, initialUser]);
+  }, [refreshProfile]);
 
   const signInWithGoogle = useCallback(async (redirectTo?: string) => {
     const supabase = createClient();
@@ -188,16 +132,22 @@ export function AuthProvider({
     return error ? { error: error.message } : {};
   }, []);
 
-  const signInWithPassword = useCallback(async (email: string, password: string) => {
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
-    if (data.user) {
-      setUser(data.user);
-      void refreshProfile(data.user.id);
-    }
-    return {};
-  }, [refreshProfile]);
+  const signInWithPassword = useCallback(
+    async (email: string, password: string) => {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) return { error: error.message };
+      if (data.user) {
+        setUser(data.user);
+        void refreshProfile(data.user.id);
+      }
+      return {};
+    },
+    [refreshProfile],
+  );
 
   const signUpWithPassword = useCallback(
     async (input: {
@@ -227,10 +177,28 @@ export function AuthProvider({
         void refreshProfile(data.session.user.id);
         return {};
       }
-      // Email confirmation açık olabilir
       return { needsConfirm: true };
     },
     [refreshProfile],
+  );
+
+  const updateDisplayName = useCallback(
+    async (name: string) => {
+      if (!user) return { error: "Not signed in" };
+      const supabase = createClient();
+      const trimmed = name.trim();
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({ display_name: trimmed || null })
+        .eq("id", user.id)
+        .select("*")
+        .maybeSingle();
+      if (error) return { error: error.message };
+      if (data) setProfile(data as Profile);
+      else await refreshProfile(user.id);
+      return {};
+    },
+    [user, refreshProfile],
   );
 
   const signOut = useCallback(async () => {
@@ -250,8 +218,7 @@ export function AuthProvider({
     [user],
   );
 
-  const displayName =
-    profile?.display_name?.trim() || nameFromUser(user);
+  const displayName = profile?.display_name?.trim() || nameFromUser(user);
 
   const value = useMemo(
     () => ({
@@ -261,6 +228,7 @@ export function AuthProvider({
       signInWithGoogle,
       signInWithPassword,
       signUpWithPassword,
+      updateDisplayName,
       signOut,
       requireAuth,
       displayName,
@@ -272,6 +240,7 @@ export function AuthProvider({
       signInWithGoogle,
       signInWithPassword,
       signUpWithPassword,
+      updateDisplayName,
       signOut,
       requireAuth,
       displayName,

@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/auth-provider";
 import { InstallPrompt } from "@/components/install-prompt";
 import { SiteHeader } from "@/components/site-header";
 import { getCurrentProfile } from "@/lib/data";
+import { LocaleProvider } from "@/lib/locale";
 import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
 
@@ -56,13 +57,15 @@ export default async function RootLayout({
   return (
     <html lang="tr" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="min-h-dvh font-sans antialiased">
-        <AuthProvider initialUser={user} initialProfile={profile}>
-          <SiteHeader />
-          <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-8 sm:px-6">
-            {children}
-          </main>
-          <InstallPrompt />
-        </AuthProvider>
+        <LocaleProvider>
+          <AuthProvider initialUser={user} initialProfile={profile}>
+            <SiteHeader />
+            <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-8 sm:px-6">
+              {children}
+            </main>
+            <InstallPrompt />
+          </AuthProvider>
+        </LocaleProvider>
       </body>
     </html>
   );
