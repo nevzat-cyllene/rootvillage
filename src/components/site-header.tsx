@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui";
+import { GoogleContinueButton } from "@/components/google-continue-button";
 import { useAuth } from "@/components/auth-provider";
 
 export function SiteHeader() {
-  const { user, profile, signInWithGoogle, signOut, loading } = useAuth();
+  const { user, profile, signOut, loading } = useAuth();
 
   return (
     <header className="sticky top-0 z-40 border-b border-border-soft/80 bg-[#fafafa]/80 backdrop-blur-xl supports-[backdrop-filter]:bg-[#fafafa]/75">
@@ -40,13 +41,7 @@ export function SiteHeader() {
                 </Button>
               </div>
             ) : (
-              <Button
-                variant="secondary"
-                className="!px-3.5 !py-1.5 text-[13px]"
-                onClick={() => void signInWithGoogle()}
-              >
-                Giriş
-              </Button>
+              <GoogleContinueButton />
             ))}
         </nav>
       </div>

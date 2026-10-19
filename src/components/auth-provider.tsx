@@ -74,11 +74,16 @@ export function AuthProvider({
 
   const signInWithGoogle = useCallback(async (redirectTo?: string) => {
     const supabase = createClient();
+    // Google OAuth = giriş + ilk kez ise otomatik kayıt (ayrı signup yok).
     const next = redirectTo ?? window.location.href;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        queryParams: {
+          // Hesap seçimi her seferinde net olsun; yeni/eski aynı akış.
+          prompt: "select_account",
+        },
       },
     });
     if (error) {
