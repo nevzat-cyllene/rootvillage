@@ -121,10 +121,25 @@ export function AuthProvider({
   const requireAuth = useCallback(
     async (redirectTo?: string) => {
       if (user) return true;
-      await signInWithGoogle(redirectTo);
+      let nextPath = "/villages";
+      if (redirectTo) {
+        try {
+          const u = redirectTo.startsWith("http")
+            ? new URL(redirectTo)
+            : new URL(redirectTo, window.location.origin);
+          if (u.origin === window.location.origin) {
+            nextPath = `${u.pathname}${u.search}${u.hash}` || "/villages";
+          }
+        } catch {
+          /* default */
+        }
+      } else {
+        nextPath = `${window.location.pathname}${window.location.search}` || "/villages";
+      }
+      window.location.assign(`/giris?next=${encodeURIComponent(nextPath)}`);
       return false;
     },
-    [signInWithGoogle, user],
+    [user],
   );
 
   const value = useMemo(

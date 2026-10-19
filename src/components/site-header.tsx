@@ -1,13 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui";
-import { GoogleContinueButton } from "@/components/google-continue-button";
 import { useAuth } from "@/components/auth-provider";
 
 export function SiteHeader() {
   const { user, profile, signOut, loading } = useAuth();
+  const pathname = usePathname();
+  const girisHref =
+    pathname && pathname !== "/giris"
+      ? `/giris?next=${encodeURIComponent(pathname)}`
+      : "/giris";
 
   return (
     <header className="sticky top-0 z-40 border-b border-border-soft/80 bg-[#fafafa]/80 backdrop-blur-xl supports-[backdrop-filter]:bg-[#fafafa]/75">
@@ -41,7 +46,12 @@ export function SiteHeader() {
                 </Button>
               </div>
             ) : (
-              <GoogleContinueButton />
+              <Link
+                href={girisHref}
+                className="pressable inline-flex items-center justify-center rounded-full border border-border-soft bg-bg-surface px-3.5 py-1.5 text-[13px] font-medium text-text titanium-surface hover:border-border"
+              >
+                Giriş
+              </Link>
             ))}
         </nav>
       </div>

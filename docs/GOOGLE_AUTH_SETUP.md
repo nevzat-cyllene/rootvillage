@@ -49,6 +49,7 @@ CylleneFitness ile **aynı** Google OAuth client’ı paylaşma — RootVillage 
 ```
 https://rootvillage.vercel.app/auth/callback
 https://rootvillage.vercel.app/**
+https://rootvillage.vercel.app/giris
 ```
 
 Providers → Google → Enable → (RootVillage’e özel) Client ID/Secret
