@@ -19,6 +19,7 @@ export function CreatePersonForm({
   const [fullName, setFullName] = useState("");
   const [birthYear, setBirthYear] = useState("");
   const [deathYear, setDeathYear] = useState("");
+  const [gender, setGender] = useState<Person["gender"]>(null);
   const [notes, setNotes] = useState("");
   const [parentId, setParentId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -48,6 +49,7 @@ export function CreatePersonForm({
         full_name: fullName.trim(),
         birth_year: birthYear ? Number(birthYear) : null,
         death_year: deathYear ? Number(deathYear) : null,
+        gender,
         notes: notes.trim() || null,
         created_by: user.id,
       })
@@ -76,6 +78,7 @@ export function CreatePersonForm({
     setFullName("");
     setBirthYear("");
     setDeathYear("");
+    setGender(null);
     setNotes("");
     setParentId("");
     router.refresh();
@@ -103,6 +106,17 @@ export function CreatePersonForm({
           inputMode="numeric"
         />
       </div>
+      <select
+        className="w-full rounded-[12px] border border-border-soft bg-bg-surface px-3.5 py-2.5 text-[15px] outline-none focus:border-accent/40 focus:ring-2 focus:ring-accent/15"
+        value={gender ?? ""}
+        onChange={(e) => setGender((e.target.value || null) as Person["gender"])}
+      >
+        <option value="">Cinsiyet (isteğe bağlı)</option>
+        <option value="male">Erkek</option>
+        <option value="female">Kadın</option>
+        <option value="other">Diğer</option>
+        <option value="unknown">Bilinmiyor</option>
+      </select>
       {people.length > 0 && (
         <select
           className="w-full rounded-[12px] border border-border-soft bg-bg-surface px-3.5 py-2.5 text-[15px] outline-none focus:border-accent/40 focus:ring-2 focus:ring-accent/15"
@@ -135,6 +149,9 @@ export function EditPersonQuick({ person }: { person: Person }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [fullName, setFullName] = useState(person.full_name);
+  const [birthYear, setBirthYear] = useState(person.birth_year?.toString() ?? "");
+  const [deathYear, setDeathYear] = useState(person.death_year?.toString() ?? "");
+  const [gender, setGender] = useState<Person["gender"]>(person.gender);
   const [notes, setNotes] = useState(person.notes ?? "");
   const [busy, setBusy] = useState(false);
 
@@ -153,28 +170,25 @@ export function EditPersonQuick({ person }: { person: Person }) {
 
     const payload = {
       full_name: fullName.trim(),
+      birth_year: birthYear ? Number(birthYear) : null,
+      death_year: deathYear ? Number(deathYear) : null,
+      gender,
       notes: notes.trim() || null,
     };
 
-    if (profile?.role === "admin") {
-      await supabase.from("people").update(payload).eq("id", person.id);
-    } else {
-      // Direct update allowed for authenticated users per plan RLS;
-      // also log a proposal trail for transparency on name changes
-      await supabase.from("people").update(payload).eq("id", person.id);
-      if (fullName.trim() !== person.full_name) {
-        await supabase.from("edit_proposals").insert({
-          target_type: "person",
-          target_id: person.id,
-          action: "update",
-          payload,
-          reason: "İsim / not güncellemesi",
-          proposed_by: user.id,
-          status: "accepted",
-          resolved_by: user.id,
-          resolved_at: new Date().toISOString(),
-        });
-      }
+    await supabase.from("people").update(payload).eq("id", person.id);
+    if (profile?.role !== "admin" && fullName.trim() !== person.full_name) {
+      await supabase.from("edit_proposals").insert({
+        target_type: "person",
+        target_id: person.id,
+        action: "update",
+        payload,
+        reason: "Kişi bilgisi güncellemesi",
+        proposed_by: user.id,
+        status: "accepted",
+        resolved_by: user.id,
+        resolved_at: new Date().toISOString(),
+      });
     }
 
     setBusy(false);
@@ -192,8 +206,33 @@ export function EditPersonQuick({ person }: { person: Person }) {
 
   return (
     <div className="mt-2 space-y-2 rounded-[12px] border border-border-soft bg-bg-elevated p-3">
-      <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
-      <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
+      <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ad soyad" />
+      <div className="grid grid-cols-2 gap-2">
+        <Input
+          value={birthYear}
+          onChange={(e) => setBirthYear(e.target.value)}
+          placeholder="Doğum yılı"
+          inputMode="numeric"
+        />
+        <Input
+          value={deathYear}
+          onChange={(e) => setDeathYear(e.target.value)}
+          placeholder="Vefat yılı"
+          inputMode="numeric"
+        />
+      </div>
+      <select
+        className="w-full rounded-[12px] border border-border-soft bg-bg-surface px-3.5 py-2.5 text-[15px] outline-none"
+        value={gender ?? ""}
+        onChange={(e) => setGender((e.target.value || null) as Person["gender"])}
+      >
+        <option value="">Cinsiyet</option>
+        <option value="male">Erkek</option>
+        <option value="female">Kadın</option>
+        <option value="other">Diğer</option>
+        <option value="unknown">Bilinmiyor</option>
+      </select>
+      <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Not" />
       <div className="flex gap-2">
         <Button disabled={busy} onClick={() => void save()}>
           Kaydet

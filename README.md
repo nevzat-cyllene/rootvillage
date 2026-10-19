@@ -18,7 +18,11 @@ cp .env.example .env.local
 
 ### 1) Supabase SQL
 
-Supabase Dashboard → SQL Editor → `supabase/migrations/001_init.sql` dosyasının tamamını çalıştır.
+Supabase Dashboard → SQL Editor → sırayla çalıştır:
+
+1. `supabase/migrations/001_init.sql`
+2. `supabase/migrations/002_clan_atlas.sql` (atlas ada konumları)
+3. `supabase/migrations/003_person_avatar.sql` (kisi foto + storage bucket)
 
 ### 2) Google Auth
 

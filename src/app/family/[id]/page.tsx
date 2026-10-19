@@ -6,7 +6,7 @@ import {
   SoftDeleteButton,
 } from "@/components/comments-panel";
 import { CreatePersonForm, EditPersonQuick } from "@/components/create-person-form";
-import { FamilyTree } from "@/components/family-tree";
+import { PersonRelationStudio } from "@/components/person-relation-studio";
 import { ShareButton } from "@/components/share-button";
 import { Badge, EmptyState, PageHeader, Surface } from "@/components/ui";
 import {
@@ -98,7 +98,7 @@ export default async function FamilyPage({
         <Badge>{people.length} kişi</Badge>
       </div>
 
-      <FamilyTree familyId={family.id} people={people} relations={relations} />
+      <PersonRelationStudio familyId={family.id} people={people} relations={relations} />
 
       {people.length === 0 ? (
         <EmptyState

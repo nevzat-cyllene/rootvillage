@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/components/auth-provider";
 import { Button, Input, Textarea } from "@/components/ui";
+import { normalizeFamilyName } from "@/lib/family-name";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -19,7 +20,8 @@ export function CreateFamilyForm({ villageId }: { villageId: string }) {
     e.preventDefault();
     const ok = await requireAuth();
     if (!ok) return;
-    if (!name.trim()) return;
+    const cleaned = normalizeFamilyName(name);
+    if (!cleaned) return;
 
     setBusy(true);
     setError(null);
@@ -36,7 +38,7 @@ export function CreateFamilyForm({ villageId }: { villageId: string }) {
       .from("families")
       .insert({
         village_id: villageId,
-        name: name.trim(),
+        name: cleaned,
         aka: aka.trim() || null,
         notes: notes.trim() || null,
         is_incomplete: true,
@@ -60,17 +62,30 @@ export function CreateFamilyForm({ villageId }: { villageId: string }) {
 
   return (
     <form onSubmit={(e) => void onSubmit(e)} className="space-y-3">
-      <Input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Aile adı"
-        required
-      />
-      <Input
-        value={aka}
-        onChange={(e) => setAka(e.target.value)}
-        placeholder="Lakap / aka (isteğe bağlı)"
-      />
+      <div>
+        <label className="mb-1.5 block text-[12px] font-medium text-text-secondary">
+          Aile adı
+        </label>
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Hacı Mehmet"
+          required
+        />
+        <p className="mt-1.5 text-[12px] text-text-tertiary">
+          Kısa tut; “Ailesi” eklemene gerek yok — otomatik temizlenir.
+        </p>
+      </div>
+      <div>
+        <label className="mb-1.5 block text-[12px] font-medium text-text-secondary">
+          Lakap
+        </label>
+        <Input
+          value={aka}
+          onChange={(e) => setAka(e.target.value)}
+          placeholder="Yerel lakap (isteğe bağlı)"
+        />
+      </div>
       <Textarea
         value={notes}
         onChange={(e) => setNotes(e.target.value)}

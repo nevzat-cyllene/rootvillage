@@ -27,6 +27,9 @@ export type Family = {
   notes: string | null;
   is_incomplete: boolean;
   disputed: boolean;
+  map_x?: number | null;
+  map_z?: number | null;
+  map_seed?: number | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -42,6 +45,7 @@ export type Person = {
   death_year: number | null;
   gender: "male" | "female" | "other" | "unknown" | null;
   notes: string | null;
+  avatar_url?: string | null;
   disputed: boolean;
   created_by: string | null;
   created_at: string;

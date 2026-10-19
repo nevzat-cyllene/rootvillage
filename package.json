@@ -10,12 +10,15 @@
     "db:setup": "powershell -ExecutionPolicy Bypass -File ./scripts/apply-migration.ps1"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "geist": "^1.8.1",
     "next": "^16.4.2",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "3.3.7",
@@ -24,6 +27,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/serviceworker": "^0.0.203",
+    "@types/three": "^0.186.0",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.2",
     "postcss": "^8.5.31",
