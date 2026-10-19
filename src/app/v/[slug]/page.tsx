@@ -45,12 +45,12 @@ export default async function VillagePage({
         title={village.name}
         description={
           village.description ??
-          "Bu köydeki sülaleleri birlikte dolduralım. Eksik aileye link at."
+          "Bu köydeki aile kayıtları. Eksik bir alan varsa paylaşarak tamamlanabilir."
         }
         actions={
           <ShareButton
             title={`${village.name} · RootVillage`}
-            text={`${village.name} ailelerini RootVillage’da dolduralım.`}
+            text={`${village.name} aile kayıtları · RootVillage`}
             label="Köyü paylaş"
           />
         }
@@ -58,9 +58,9 @@ export default async function VillagePage({
 
       {incomplete.length > 0 && (
         <Surface className="mb-8 border-dashed !border-[#e5d7b8] !bg-[#fffbf2]">
-          <p className="text-[14px] font-semibold tracking-[-0.02em]">Eksik sülaleler</p>
+          <p className="text-[14px] font-semibold tracking-[-0.02em]">Tamamlanmamış aileler</p>
           <p className="mt-1 text-[13px] text-text-secondary">
-            Bu aileler henüz dolu değil. Linki o aileden birine at — onlar eklesin.
+            Bu kayıtlarda henüz kişi yok. İlgili kişilere ileterek doldurulabilir.
           </p>
           <ul className="mt-3 flex flex-wrap gap-2">
             {incomplete.slice(0, 8).map((f) => (
@@ -85,7 +85,7 @@ export default async function VillagePage({
       {families.length === 0 ? (
         <EmptyState
           title="Henüz aile yok"
-          description="İlk sülaleyi ekle. Sonra kişileri ve yorumları doldurun."
+          description="İlk aile kaydını ekleyerek başlayın."
         />
       ) : (
         <ul className="stagger mb-10 grid gap-3 sm:grid-cols-2">
@@ -122,7 +122,7 @@ export default async function VillagePage({
       <Surface className="mb-4">
         <h2 className="mb-1 text-[18px] font-semibold tracking-[-0.02em]">Yeni aile ekle</h2>
         <p className="mb-4 text-[13px] text-text-secondary">
-          Yazmak için Google girişi gerekir. Yanlış girişler düzenlenebilir; silme öneri ile gider.
+          Aile adını ekle. Kayıtlar sonra düzenlenebilir; kaldırılma talepleri arşivde kalır.
         </p>
         <CreateFamilyForm villageId={village.id} />
       </Surface>

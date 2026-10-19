@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" fill="none">
+  <defs>
+    <radialGradient id="glow4" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(400 160) rotate(90) scale(220 280)">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F0F2F5" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sky4" x1="0" y1="0" x2="0" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5F6F8"/>
+      <stop offset="1" stop-color="#E2E6EC"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="480" fill="url(#sky4)"/>
+  <rect width="800" height="480" fill="url(#glow4)"/>
+  <path d="M0 280C100 240 200 255 320 230C480 198 580 210 800 190V480H0V280Z" fill="#D0D5DC"/>
+  <path d="M0 340C180 310 300 330 450 310C620 286 700 300 800 290V480H0V340Z" fill="#E9ECF0"/>
+  <!-- stone houses row -->
+  <g opacity="0.95">
+    <rect x="280" y="268" width="60" height="72" fill="#F8F9FA" stroke="#C9CED5"/>
+    <path d="M274 272L310 238L346 272H274Z" fill="#5B6B7C"/>
+    <rect x="350" y="255" width="70" height="85" fill="#FAFBFC" stroke="#C9CED5"/>
+    <path d="M342 260L385 218L428 260H342Z" fill="#3F4A57"/>
+    <rect x="430" y="275" width="55" height="65" fill="#F4F5F7" stroke="#C9CED5"/>
+    <path d="M424 278L457 248L490 278H424Z" fill="#7C8794"/>
+    <rect x="495" y="265" width="65" height="75" fill="#F7F8FA" stroke="#C9CED5"/>
+    <path d="M488 270L527 232L566 270H488Z" fill="#5B6B7C"/>
+  </g>
+  <!-- olive trees soft -->
+  <circle cx="180" cy="320" r="36" fill="#A8B0BA" fill-opacity="0.35"/>
+  <circle cx="210" cy="310" r="28" fill="#9AA3AE" fill-opacity="0.4"/>
+  <circle cx="650" cy="315" r="40" fill="#ADB5BF" fill-opacity="0.35"/>
+  <rect x="372" y="310" width="16" height="40" rx="2" fill="#6E7A88" fill-opacity="0.5"/>
+</svg>

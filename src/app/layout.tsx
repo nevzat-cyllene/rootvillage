@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     template: "%s · RootVillage",
   },
   description:
-    "Köy hafızasını görünür kıl. Aileleri, ataları ve anıları sonraki nesillere aktar.",
+    "Köy hafızasını görünür kıl. Aileler, atalar ve anılar için ortak bir bellek.",
   applicationName: "RootVillage",
   appleWebApp: {
     capable: true,

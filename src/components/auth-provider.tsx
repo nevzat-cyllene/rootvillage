@@ -75,12 +75,20 @@ export function AuthProvider({
   const signInWithGoogle = useCallback(async (redirectTo?: string) => {
     const supabase = createClient();
     const next = redirectTo ?? window.location.href;
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     });
+    if (error) {
+      const hint =
+        error.message.toLowerCase().includes("provider") ||
+        error.message.toLowerCase().includes("not enabled")
+          ? "Supabase’te Google girişi henüz açık değil. Dashboard → Authentication → Providers → Google."
+          : error.message;
+      window.alert(hint);
+    }
   }, []);
 
   const signOut = useCallback(async () => {

@@ -26,8 +26,9 @@ export default async function HomePage() {
             görünür kıl.
           </h1>
           <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-text-secondary sm:text-[18px]">
-            RootVillage, ataları, sülaleleri ve anıları birlikte kaydetmen için.
-            Kültürel mirası sonraki nesillere taşı — siyaset değil, hafıza.
+            RootVillage, ataları, akrabaları ve anıları birlikte kaydetmen için.
+            Kültürel mirası sonraki nesillere taşı — bilgiyi düzenle,
+            ortak bir bellek kur.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link href="/villages">
@@ -49,7 +50,7 @@ export default async function HomePage() {
           <div>
             <h2 className="text-[22px] font-semibold tracking-[-0.03em]">Canlı köyler</h2>
             <p className="mt-1 text-[14px] text-text-secondary">
-              Bir sülale eksikse linki o aileye at — onlar doldursun.
+              Eksik bir aile varsa paylaş; kayıt birlikte tamamlanır.
             </p>
           </div>
           <Link href="/villages" className="text-[13px] font-medium text-accent">
@@ -61,7 +62,7 @@ export default async function HomePage() {
           <div className="rounded-[var(--radius)] border border-dashed border-border bg-bg-surface/70 px-6 py-10 text-center">
             <p className="text-[16px] font-medium">Henüz köy yok</p>
             <p className="mt-2 text-[14px] text-text-secondary">
-              İlk köyü sen aç; akrabaların dalları büyütür.
+              Veritabanı hazır — ilk köyü oluşturarak arşivi başlatın.
             </p>
             <Link href="/villages#yeni" className="mt-5 inline-block">
               <Button>İlk köyü oluştur</Button>
@@ -92,16 +93,16 @@ export default async function HomePage() {
       <section className="mt-14 grid gap-6 sm:grid-cols-3">
         {[
           {
-            t: "Herkes okur",
-            d: "Linki açan anında köyü ve aileleri görür. Kayıt şart değil.",
+            t: "Açık okuma",
+            d: "Köy ve aile kayıtları linkle hemen açılır. Gezmek için hesap gerekmez.",
           },
           {
-            t: "Yazmak için Google",
-            d: "Ekle, düzelt, yorumla — sadece o anda giriş yeterli.",
+            t: "Katılınca yaz",
+            d: "Kişi eklemek, düzeltmek veya yorum bırakmak istediğinde giriş yeterli.",
           },
           {
-            t: "Ölçülü güven",
-            d: "Silme önerileri incelenir. Tartışmalı bilgi işaretlenir.",
+            t: "Düzenli arşiv",
+            d: "Değişiklikler izlenir; belirsiz kayıtlar işaretlenir, silme talepleri gözden geçer.",
           },
         ].map((item) => (
           <div key={item.t} className="animate-fade-up">

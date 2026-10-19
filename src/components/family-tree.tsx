@@ -199,17 +199,17 @@ export function FamilyTree({
   if (people.length === 0) {
     return (
       <div className="mb-8 rounded-[var(--radius)] border border-dashed border-border bg-bg-surface/70 px-5 py-10 text-center">
-        <p className="text-[16px] font-semibold tracking-[-0.02em]">Ağaç burada büyüyecek</p>
+        <p className="text-[16px] font-semibold tracking-[-0.02em]">İlişki haritası boş</p>
         <p className="mx-auto mt-2 max-w-md text-[13px] text-text-secondary">
-          İstediğin kişiden başla — sen, amcan, deden… Sonra yukarı (ebeveyn), aşağı (çocuk), yan
-          (kardeş / eş) ekle. Atadan gelmek zorunda değilsin.
+          Herhangi bir kişiden başlayabilirsiniz. Ebeveyn, çocuk, kardeş veya eş bağları sonradan
+          eklenir.
         </p>
       </div>
     );
   }
 
   const roleLabel: Record<AddRole, string> = {
-    parent: "Ebeveyn (anne / baba / dede yönü)",
+    parent: "Ebeveyn",
     child: "Çocuk",
     sibling: "Kardeş",
     spouse: "Eş",
@@ -219,9 +219,9 @@ export function FamilyTree({
     <section className="mb-10 animate-fade-up">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-[20px] font-semibold tracking-[-0.03em]">Soy ağacı</h2>
+          <h2 className="text-[20px] font-semibold tracking-[-0.03em]">İlişki haritası</h2>
           <p className="mt-1 text-[13px] text-text-secondary">
-            Ortadaki kişiye dokunup gez. Sürükle · iki parmakla yakınlaştır. Her yönden ekle.
+            Odak kişiyi seçin; sürükleyerek ve yakınlaştırarak gezin.
           </p>
         </div>
         <div className="flex gap-2">
@@ -278,7 +278,7 @@ export function FamilyTree({
           {focus && links && (
             <div className="flex w-[320px] flex-col items-center gap-5 sm:w-[420px]">
               {/* Parents row */}
-              <TreeRow label="Yukarı · ebeveynler">
+              <TreeRow label="Ebeveynler">
                 {links.parents.map((p) => (
                   <PersonNode
                     key={p.id}
@@ -296,7 +296,7 @@ export function FamilyTree({
               <div className="flex items-center gap-3">
                 <div className="flex flex-col items-center gap-2">
                   <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-text-secondary">
-                    Yan · kardeş
+                    Kardeş
                   </span>
                   <div className="flex flex-col gap-2">
                     {links.siblings.slice(0, 4).map((p) => (
@@ -316,7 +316,7 @@ export function FamilyTree({
 
                 <div className="flex flex-col items-center gap-2">
                   <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-text-secondary">
-                    Yan · eş
+                    Eş
                   </span>
                   <div className="flex flex-col gap-2">
                     {links.spouses.map((p) => (
@@ -336,7 +336,7 @@ export function FamilyTree({
               <Connector />
 
               {/* Children */}
-              <TreeRow label="Aşağı · çocuklar">
+              <TreeRow label="Çocuklar">
                 {links.children.map((p) => (
                   <PersonNode
                     key={p.id}
@@ -352,7 +352,7 @@ export function FamilyTree({
         </div>
 
         <p className="pointer-events-none absolute bottom-3 left-0 right-0 text-center text-[11px] text-text-secondary">
-          Odak: {focus?.full_name ?? "—"} · dokunarak dallara geç
+          Odak: {focus?.full_name ?? "—"}
         </p>
       </div>
 
@@ -373,7 +373,7 @@ export function FamilyTree({
             {focus?.full_name} → {roleLabel[addRole]}
           </p>
           <p className="mt-1 text-[12px] text-text-secondary">
-            İsim yaz, kaydet. Ağaç o kişiyi merkeze alır — böylece yukarı/aşağı/yan büyür.
+            Kaydettikten sonra yeni kişi odak noktasına alınır.
           </p>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <Input

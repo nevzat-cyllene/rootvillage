@@ -81,8 +81,8 @@ export default async function FamilyPage({
           <>
             <ShareButton
               title={`${family.name} ailesi · RootVillage`}
-              text={`“${family.name}” sülalesi henüz dolu değil — RootVillage’da dolduralım.`}
-              label="Bu sülaleyi paylaş"
+              text={`“${family.name}” aile kaydı · RootVillage`}
+              label="Aileyi paylaş"
             />
             <DisputeToggle table="families" id={family.id} disputed={family.disputed} />
             <SoftDeleteButton table="families" id={family.id} />
@@ -149,9 +149,9 @@ export default async function FamilyPage({
       )}
 
       <Surface className="mb-4">
-        <h2 className="mb-1 text-[18px] font-semibold tracking-[-0.02em]">İlk kişiyi / yeni dal ekle</h2>
+        <h2 className="mb-1 text-[18px] font-semibold tracking-[-0.02em]">Kişi ekle</h2>
         <p className="mb-4 text-[13px] text-text-secondary">
-          Ağaç boşsa buradan başla. Sonra ağaçta her yönden (+ Ebeveyn / Çocuk / Kardeş / Eş) devam et.
+          İlk kişiyi buradan ekleyin. İlişkiler harita üzerinden bağlanır.
         </p>
         <CreatePersonForm familyId={family.id} people={people} />
       </Surface>

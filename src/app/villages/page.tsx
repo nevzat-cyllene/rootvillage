@@ -18,7 +18,7 @@ export default async function VillagesPage({
       <PageHeader
         eyebrow="RootVillage"
         title="Köyler"
-        description="Köyünü bul veya yeni bir başlık aç. Her köy kendi aile ağacını büyütür."
+        description="Mevcut köyleri keşfedin veya yeni bir köy kaydı oluşturun."
       />
 
       <form className="mb-8 animate-fade-up">
@@ -64,7 +64,7 @@ export default async function VillagesPage({
         <Surface>
           <h2 className="text-[18px] font-semibold tracking-[-0.02em]">Yeni köy ekle</h2>
           <p className="mt-1 mb-4 text-[13px] text-text-secondary">
-            Kaydetmek için Google ile giriş istenir. Köy adı başlık olur; oradan aileler eklenir.
+            Yeni bir köy başlığı aç; aileler ve kişiler onun altında toplanır.
           </p>
           <CreateVillageForm />
         </Surface>

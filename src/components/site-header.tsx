@@ -45,7 +45,7 @@ export function SiteHeader() {
                 className="!px-3.5 !py-1.5 text-[13px]"
                 onClick={() => void signInWithGoogle()}
               >
-                Google ile giriş
+                Giriş
               </Button>
             ))}
         </nav>

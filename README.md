@@ -22,14 +22,14 @@ Supabase Dashboard → SQL Editor → `supabase/migrations/001_init.sql` dosyas�
 
 ### 2) Google Auth
 
-Supabase → Authentication → Providers → Google: aç.
+Detay: `docs/GOOGLE_AUTH_SETUP.md`
 
-Redirect URL’leri:
-
-- `http://localhost:3000/auth/callback`
-- `https://SENIN-VERCEL-DOMAIN.vercel.app/auth/callback`
-
-Google Cloud Console’da aynı callback’leri OAuth client’a ekle.
+- Site: `https://rootvillage.vercel.app`
+- **Google Cloud** redirect URI (tek):  
+  `https://chfyoorjulkwyplyunco.supabase.co/auth/v1/callback`
+- **Supabase** Redirect URLs:  
+  `https://rootvillage.vercel.app/auth/callback`
+- Providers → Google → Client ID/Secret yapıştır
 
 ### 3) İlk admin
 

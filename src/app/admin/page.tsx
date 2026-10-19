@@ -15,7 +15,7 @@ export default async function AdminPage() {
       <PageHeader
         eyebrow="Yönetim"
         title="Öneri kuyruğu"
-        description="Silme ve düzeltme önerilerini onayla veya reddet. Ölçülü güven burada."
+        description="Bekleyen düzeltme ve kaldırma taleplerini onayla veya reddet."
       />
       <Surface className="mb-6">
         <p className="text-[13px] text-text-secondary">

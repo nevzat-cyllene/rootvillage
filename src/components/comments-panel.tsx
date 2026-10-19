@@ -60,9 +60,9 @@ export function CommentsPanel({
     <section className="mt-10 animate-fade-up">
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
-          <h2 className="text-[20px] font-semibold tracking-[-0.03em]">Yorumlar & anılar</h2>
+          <h2 className="text-[20px] font-semibold tracking-[-0.03em]">Notlar</h2>
           <p className="mt-1 text-[13px] text-text-secondary">
-            Bilgi doğru mu? Bu dönemde ne olmuş? Kısa not bırak.
+            Düzeltme, bağlam veya dönem bilgisi ekleyin.
           </p>
         </div>
       </div>
@@ -75,13 +75,13 @@ export function CommentsPanel({
             placeholder={
               user
                 ? "Örn: Bu aile 1950’lerde X mahallesinde otururdu…"
-                : "Yorum yazmak için Google ile giriş yapacaksın"
+                : "Kısa bir not veya düzeltme bırak…"
             }
           />
           {error && <p className="text-[13px] text-danger">{error}</p>}
           <div className="flex justify-end">
             <Button type="submit" disabled={busy || !body.trim()}>
-              {user ? "Yorum ekle" : "Giriş yap & yorumla"}
+              Yorum ekle
             </Button>
           </div>
         </form>
@@ -89,8 +89,8 @@ export function CommentsPanel({
 
       {initialComments.length === 0 ? (
         <EmptyState
-          title="Henüz yorum yok"
-          description="İlk anıyı veya düzeltmeyi sen bırak — sonraki nesiller için iz kalır."
+          title="Henüz not yok"
+          description="Bu kayıt için ilk notu ekleyebilirsiniz."
         />
       ) : (
         <ul className="stagger space-y-3">

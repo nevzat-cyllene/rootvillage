@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" fill="none">
+  <defs>
+    <linearGradient id="sky2" x1="400" y1="0" x2="400" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FAFAFA"/>
+      <stop offset="0.4" stop-color="#F0F2F5"/>
+      <stop offset="1" stop-color="#DFE4EA"/>
+    </linearGradient>
+    <linearGradient id="mist2" x1="0" y1="180" x2="800" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="480" fill="url(#sky2)"/>
+  <path d="M0 260C90 210 180 230 280 200C400 164 480 180 800 150V480H0V260Z" fill="#D5DAE1"/>
+  <path d="M0 320C140 280 260 300 400 275C560 246 680 270 800 250V480H0V320Z" fill="#E6E9EE"/>
+  <rect width="800" height="480" fill="url(#mist2)"/>
+  <!-- minaret-like silhouette soft -->
+  <rect x="372" y="168" width="16" height="120" rx="3" fill="#6B7684"/>
+  <circle cx="380" cy="160" r="10" fill="#5B6B7C"/>
+  <path d="M380 130L386 158H374L380 130Z" fill="#8E97A3"/>
+  <!-- clustered roofs -->
+  <rect x="250" y="250" width="70" height="55" fill="#F7F8FA" stroke="#C8CCD2"/>
+  <path d="M242 254L285 220L328 254H242Z" fill="#5B6B7C"/>
+  <rect x="330" y="262" width="58" height="48" fill="#F4F5F7" stroke="#C8CCD2"/>
+  <path d="M322 266L359 238L396 266H322Z" fill="#7C8794"/>
+  <rect x="400" y="255" width="78" height="58" fill="#FAFBFC" stroke="#C8CCD2"/>
+  <path d="M392 259L439 222L486 259H392Z" fill="#4A5562"/>
+  <rect x="490" y="270" width="54" height="44" fill="#F5F6F8" stroke="#C8CCD2"/>
+  <path d="M484 274L517 248L550 274H484Z" fill="#9099A5"/>
+  <ellipse cx="200" cy="310" rx="26" ry="36" fill="#ADB5BF" fill-opacity="0.45"/>
+  <ellipse cx="600" cy="300" rx="30" ry="40" fill="#9AA3AE" fill-opacity="0.4"/>
+</svg>

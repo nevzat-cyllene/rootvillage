@@ -63,7 +63,7 @@ export function CreateFamilyForm({ villageId }: { villageId: string }) {
       <Input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Aile / sülale adı"
+        placeholder="Aile adı"
         required
       />
       <Input
