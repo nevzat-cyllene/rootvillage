@@ -75,13 +75,28 @@ export function AuthProvider({
   const signInWithGoogle = useCallback(async (redirectTo?: string) => {
     const supabase = createClient();
     // Google OAuth = giriş + ilk kez ise otomatik kayıt (ayrı signup yok).
-    const next = redirectTo ?? window.location.href;
+    // next her zaman aynı origin içinde kalsın (başka Vercel app'e kaçmasın).
+    let nextPath = "/villages";
+    if (redirectTo) {
+      try {
+        const u = redirectTo.startsWith("http")
+          ? new URL(redirectTo)
+          : new URL(redirectTo, window.location.origin);
+        if (u.origin === window.location.origin) {
+          nextPath = `${u.pathname}${u.search}${u.hash}` || "/villages";
+        }
+      } catch {
+        /* keep default */
+      }
+    } else {
+      nextPath = `${window.location.pathname}${window.location.search}` || "/villages";
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
         queryParams: {
-          // Hesap seçimi her seferinde net olsun; yeni/eski aynı akış.
           prompt: "select_account",
         },
       },

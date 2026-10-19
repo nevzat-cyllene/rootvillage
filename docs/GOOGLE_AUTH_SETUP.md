@@ -34,16 +34,24 @@ Burayı doldurmazsan Google “Sign in to chfyoorjulkwyplyunco.supabase.co” g�
 
 **Publish** / brand verification gönder (birkaç gün sürebilir). Doğrulanınca isim + logo öne çıkar.
 
-## 3) Supabase
-https://supabase.com/dashboard/project/chfyoorjulkwyplyunco/auth/providers
+## 3) Supabase — Site URL kritik
+https://supabase.com/dashboard/project/chfyoorjulkwyplyunco/auth/url-configuration
 
-- Providers → Google → Enable → Client ID/Secret
-- Site URL: `https://rootvillage.vercel.app`
-- Redirect URLs:
+**Site URL mutlaka:**
+```
+https://rootvillage.vercel.app
+```
+
+`cyllene-fitness.vercel.app` yazıyorsa Google sonrası oraya düşersin.  
+CylleneFitness ile **aynı** Google OAuth client’ı paylaşma — RootVillage için ayrı client aç, App name: `RootVillage`.
+
+**Redirect URLs:**
 ```
 https://rootvillage.vercel.app/auth/callback
 https://rootvillage.vercel.app/**
 ```
+
+Providers → Google → Enable → (RootVillage’e özel) Client ID/Secret
 
 ## 4) `supabase.co` yazısını tamamen kaldırmak (SaaS seviyesi)
 
