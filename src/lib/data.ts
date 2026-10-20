@@ -3,6 +3,7 @@ import type {
   Comment,
   EditProposal,
   Family,
+  HeritageEntry,
   Person,
   PersonRelation,
   Profile,
@@ -11,17 +12,26 @@ import type {
 
 export async function getVillages(query?: string): Promise<Village[]> {
   const supabase = await createClient();
-  let q = supabase
-    .from("villages")
-    .select("*, families(count)")
-    .is("deleted_at", null)
-    .order("name", { ascending: true });
+  const term = query?.trim();
+  const villagesQuery = (includeTurkishName: boolean) => {
+    let request = supabase
+      .from("villages")
+      .select("*, families(count)")
+      .is("deleted_at", null)
+      .order("name", { ascending: true });
+    if (term) {
+      request = includeTurkishName
+        ? request.or(`name.ilike.%${term}%,name_tr.ilike.%${term}%`)
+        : request.ilike("name", `%${term}%`);
+    }
+    return request;
+  };
 
-  if (query?.trim()) {
-    q = q.ilike("name", `%${query.trim()}%`);
+  let { data, error } = await villagesQuery(true);
+  // Deploys remain readable until migration 004 has been applied.
+  if (error?.code === "42703" || error?.code === "PGRST204") {
+    ({ data, error } = await villagesQuery(false));
   }
-
-  const { data, error } = await q;
   if (error) {
     console.error("getVillages", error.message);
     return [];
@@ -33,6 +43,44 @@ export async function getVillages(query?: string): Promise<Village[]> {
       ? (row.families[0] as { count: number } | undefined)?.count ?? 0
       : 0,
   }));
+}
+
+export async function getHeritageEntries(query?: string): Promise<HeritageEntry[]> {
+  const supabase = await createClient();
+  let q = supabase
+    .from("heritage_entries")
+    .select("*")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+
+  if (query?.trim()) {
+    const term = query.trim();
+    q = q.or(`title.ilike.%${term}%,title_tr.ilike.%${term}%,location_text.ilike.%${term}%`);
+  }
+
+  const { data, error } = await q;
+  if (error) {
+    if (error.code === "PGRST205" || error.code === "42P01") return [];
+    console.error("getHeritageEntries", error.message);
+    return [];
+  }
+  return (data ?? []) as HeritageEntry[];
+}
+
+export async function getHeritageEntryBySlug(slug: string): Promise<HeritageEntry | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("heritage_entries")
+    .select("*")
+    .eq("slug", slug)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) {
+    console.error("getHeritageEntryBySlug", error.message);
+    return null;
+  }
+  return data as HeritageEntry | null;
 }
 
 export async function getVillageBySlug(slug: string): Promise<Village | null> {

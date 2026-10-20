@@ -11,6 +11,7 @@ export function CreateVillageForm() {
   const { requireAuth } = useAuth();
   const router = useRouter();
   const [name, setName] = useState("");
+  const [nameTr, setNameTr] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +40,7 @@ export function CreateVillageForm() {
         .from("villages")
         .insert({
           name: name.trim(),
+          name_tr: nameTr.trim() || null,
           slug,
           description: description.trim() || null,
           created_by: user.id,
@@ -69,12 +71,30 @@ export function CreateVillageForm() {
 
   return (
     <form onSubmit={(e) => void onSubmit(e)} className="space-y-3">
+      <div>
+        <label className="mb-1.5 block text-[12px] font-medium text-text-secondary">
+          Köyün yerel / Kürtçe adı
+        </label>
       <Input
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Köy adı"
         required
       />
+      </div>
+      <div>
+        <label className="mb-1.5 block text-[12px] font-medium text-text-secondary">
+          Türkçe adı <span className="font-normal text-text-tertiary">(isteğe bağlı)</span>
+        </label>
+        <Input
+          value={nameTr}
+          onChange={(e) => setNameTr(e.target.value)}
+          placeholder="Varsa resmî veya yaygın Türkçe karşılığı"
+        />
+        <p className="mt-1.5 text-[12px] text-text-tertiary">
+          Kaydedildiğinde ana adın hemen altında gösterilir; topluluk daha sonra güncelleyebilir.
+        </p>
+      </div>
       <Textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}

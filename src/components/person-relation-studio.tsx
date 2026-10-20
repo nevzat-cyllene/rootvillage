@@ -5,7 +5,12 @@ import { PersonAvatar } from "@/components/person-avatar";
 import { Button, Input, Textarea } from "@/components/ui";
 import { uploadPersonAvatar } from "@/lib/avatar-upload";
 import { createClient } from "@/lib/supabase/client";
-import { linksForPerson, pickDefaultFocus } from "@/lib/tree";
+import {
+  extendedLinksForPerson,
+  linksForPerson,
+  pickDefaultFocus,
+  wouldCreateParentCycle,
+} from "@/lib/tree";
 import type { Person, PersonRelation } from "@/lib/types";
 import { cn, formatYearRange } from "@/lib/utils";
 import Link from "next/link";
@@ -89,6 +94,9 @@ export function PersonRelationStudio({
   const { requireAuth } = useAuth();
   const [focusId, setFocusId] = useState<string | null>(null);
   const [addRole, setAddRole] = useState<AddRole | null>(null);
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
+  const [connectionRole, setConnectionRole] = useState<AddRole>("parent");
+  const [connectionPersonId, setConnectionPersonId] = useState("");
   const [draft, setDraft] = useState<PersonDraft>(emptyDraft());
   const [editOpen, setEditOpen] = useState(false);
   const [editDraft, setEditDraft] = useState<PersonDraft>(emptyDraft());
@@ -124,6 +132,7 @@ export function PersonRelationStudio({
 
   useEffect(() => {
     setEditOpen(false);
+    setConnectionsOpen(false);
     setError(null);
   }, [focusId]);
 
@@ -143,6 +152,156 @@ export function PersonRelationStudio({
     setEditOpen(true);
     setAddRole(null);
     setError(null);
+  }
+
+  function openConnections() {
+    setAddRole(null);
+    setEditOpen(false);
+    setConnectionRole("parent");
+    setConnectionPersonId("");
+    setConnectionsOpen(true);
+    setError(null);
+  }
+
+  async function connectExistingPerson() {
+    if (!focus || !connectionPersonId) return;
+    const selected = people.find((person) => person.id === connectionPersonId);
+    if (!selected || selected.id === focus.id) {
+      setError("Bağlanacak geçerli bir kişi seçin.");
+      return;
+    }
+
+    const ok = await requireAuth();
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setBusy(false);
+      return;
+    }
+
+    const pending: Array<{
+      person_id: string;
+      related_person_id: string;
+      relation_type: "parent" | "spouse";
+      created_by: string;
+    }> = [];
+
+    if (connectionRole === "parent") {
+      if (wouldCreateParentCycle(focus.id, selected.id, relations)) {
+        setBusy(false);
+        setError("Bu ebeveyn bağlantısı soy ağacında döngü oluşturur.");
+        return;
+      }
+      pending.push({
+        person_id: focus.id,
+        related_person_id: selected.id,
+        relation_type: "parent",
+        created_by: user.id,
+      });
+    } else if (connectionRole === "child") {
+      if (wouldCreateParentCycle(selected.id, focus.id, relations)) {
+        setBusy(false);
+        setError("Bu çocuk bağlantısı soy ağacında döngü oluşturur.");
+        return;
+      }
+      pending.push({
+        person_id: selected.id,
+        related_person_id: focus.id,
+        relation_type: "parent",
+        created_by: user.id,
+      });
+    } else if (connectionRole === "spouse") {
+      const alreadySpouses = relations.some(
+        (relation) =>
+          relation.relation_type === "spouse" &&
+          ((relation.person_id === focus.id && relation.related_person_id === selected.id) ||
+            (relation.person_id === selected.id && relation.related_person_id === focus.id)),
+      );
+      if (alreadySpouses) {
+        setBusy(false);
+        setError("Bu eş bağlantısı zaten var.");
+        return;
+      }
+      pending.push({
+        person_id: focus.id,
+        related_person_id: selected.id,
+        relation_type: "spouse",
+        created_by: user.id,
+      });
+    } else {
+      const parentIds = relations
+        .filter((relation) => relation.person_id === focus.id && relation.relation_type === "parent")
+        .map((relation) => relation.related_person_id);
+      if (parentIds.length === 0) {
+        setBusy(false);
+        setError("Kardeş bağlantısı için önce odak kişinin en az bir ebeveynini ekleyin.");
+        return;
+      }
+      for (const parentId of parentIds) {
+        const alreadyLinked = relations.some(
+          (relation) =>
+            relation.person_id === selected.id &&
+            relation.related_person_id === parentId &&
+            relation.relation_type === "parent",
+        );
+        if (!alreadyLinked) {
+          pending.push({
+            person_id: selected.id,
+            related_person_id: parentId,
+            relation_type: "parent",
+            created_by: user.id,
+          });
+        }
+      }
+    }
+
+    const uniquePending = pending.filter(
+      (candidate) =>
+        !relations.some(
+          (relation) =>
+            relation.person_id === candidate.person_id &&
+            relation.related_person_id === candidate.related_person_id &&
+            relation.relation_type === candidate.relation_type,
+        ),
+    );
+    if (uniquePending.length === 0) {
+      setBusy(false);
+      setError("Bu bağlantı zaten kayıtlı.");
+      return;
+    }
+
+    const { error: insertError } = await supabase.from("person_relations").insert(uniquePending);
+    setBusy(false);
+    if (insertError) {
+      setError(insertError.message);
+      return;
+    }
+    setConnectionsOpen(false);
+    setConnectionPersonId("");
+    router.refresh();
+  }
+
+  async function removeConnection(relationId: string) {
+    const ok = await requireAuth();
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    const { error: deleteError } = await createClient()
+      .from("person_relations")
+      .delete()
+      .eq("id", relationId);
+    setBusy(false);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    router.refresh();
   }
 
   async function addRelative() {
@@ -372,6 +531,7 @@ export function PersonRelationStudio({
                 variant="focus"
                 pulse={pulse}
                 onEdit={openEdit}
+                onConnections={openConnections}
                 detailHref={`/person/${focus.id}`}
               />
             )}
@@ -448,6 +608,27 @@ export function PersonRelationStudio({
         </div>
       </div>
 
+      {connectionsOpen && focus && (
+        <ConnectionSheet
+          focus={focus}
+          people={people}
+          relations={relations}
+          role={connectionRole}
+          selectedPersonId={connectionPersonId}
+          busy={busy}
+          error={error}
+          onRoleChange={setConnectionRole}
+          onPersonChange={setConnectionPersonId}
+          onSave={() => void connectExistingPerson()}
+          onRemove={(relationId) => void removeConnection(relationId)}
+          onCancel={() => {
+            setConnectionsOpen(false);
+            setConnectionPersonId("");
+            setError(null);
+          }}
+        />
+      )}
+
       {addRole && focus && (
         <PersonFormSheet
           title={`${focus.full_name} → ${ROLE_LABEL[addRole]}`}
@@ -503,6 +684,7 @@ function HeroPersonCard({
   variant,
   pulse,
   onEdit,
+  onConnections,
   onSelect,
   detailHref,
 }: {
@@ -510,6 +692,7 @@ function HeroPersonCard({
   variant: "focus" | "partner";
   pulse?: boolean;
   onEdit?: () => void;
+  onConnections?: () => void;
   onSelect?: () => void;
   detailHref?: string;
 }) {
@@ -547,6 +730,18 @@ function HeroPersonCard({
           >
             Düzenle
           </button>
+          {onConnections && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onConnections();
+              }}
+              className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium hover:bg-white/20"
+            >
+              Bağlar
+            </button>
+          )}
           <Link
             href={detailHref}
             onClick={(e) => e.stopPropagation()}
@@ -586,6 +781,161 @@ function HeroPersonCard({
     >
       {inner}
     </button>
+  );
+}
+
+function ConnectionSheet({
+  focus,
+  people,
+  relations,
+  role,
+  selectedPersonId,
+  busy,
+  error,
+  onRoleChange,
+  onPersonChange,
+  onSave,
+  onRemove,
+  onCancel,
+}: {
+  focus: Person;
+  people: Person[];
+  relations: PersonRelation[];
+  role: AddRole;
+  selectedPersonId: string;
+  busy: boolean;
+  error: string | null;
+  onRoleChange: (role: AddRole) => void;
+  onPersonChange: (personId: string) => void;
+  onSave: () => void;
+  onRemove: (relationId: string) => void;
+  onCancel: () => void;
+}) {
+  const byId = new Map(people.map((person) => [person.id, person]));
+  const directConnections = relations.flatMap((relation) => {
+    if (relation.relation_type === "parent" && relation.person_id === focus.id) {
+      const person = byId.get(relation.related_person_id);
+      return person ? [{ relation, person, label: "Ebeveyn" }] : [];
+    }
+    if (relation.relation_type === "parent" && relation.related_person_id === focus.id) {
+      const person = byId.get(relation.person_id);
+      return person ? [{ relation, person, label: "Çocuk" }] : [];
+    }
+    if (relation.relation_type === "spouse") {
+      const otherId = relation.person_id === focus.id ? relation.related_person_id : relation.related_person_id === focus.id ? relation.person_id : null;
+      const person = otherId ? byId.get(otherId) : null;
+      return person ? [{ relation, person, label: "Eş" }] : [];
+    }
+    return [];
+  });
+  const extended = extendedLinksForPerson(focus.id, people, relations);
+  const roleHelp: Record<AddRole, string> = {
+    parent: "Seçilen kişi odak kişinin ebeveyni olur.",
+    child: "Seçilen kişi odak kişinin çocuğu olur.",
+    sibling: "Seçilen kişi odak kişinin bilinen ebeveynleriyle bağlanır.",
+    spouse: "Seçilen kişi odak kişinin eşi olarak bağlanır.",
+  };
+
+  return (
+    <div className="mt-4 animate-fade-up rounded-[16px] border border-border-soft bg-bg-surface p-4 shadow-[var(--shadow)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[14px] font-semibold tracking-[-0.02em]">{focus.full_name} · bağlar</p>
+          <p className="mt-1 text-[12px] leading-relaxed text-text-secondary">
+            Ebeveyn ve eş ilişkileri kaynak kayıttır; diğer akrabalık adları bunlardan hesaplanır.
+          </p>
+        </div>
+        <button type="button" onClick={onCancel} className="text-[12px] text-text-secondary hover:text-text">
+          Kapat
+        </button>
+      </div>
+
+      <div className="mt-4 rounded-[12px] border border-border-soft bg-bg-elevated/60 p-3">
+        <div className="flex flex-wrap gap-1.5">
+          {(
+            [
+              ["parent", "Ebeveyn"],
+              ["child", "Çocuk"],
+              ["sibling", "Kardeş"],
+              ["spouse", "Eş"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onRoleChange(id)}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors",
+                role === id ? "bg-text text-white" : "bg-bg-surface text-text-secondary hover:text-text",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-[12px] text-text-secondary">{roleHelp[role]}</p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <select
+            value={selectedPersonId}
+            onChange={(event) => onPersonChange(event.target.value)}
+            className="min-w-0 flex-1 rounded-[10px] border border-border-soft bg-bg-surface px-3 py-2 text-[13px] outline-none focus:border-accent/40 focus:ring-2 focus:ring-accent/15"
+          >
+            <option value="">Mevcut bir kişi seçin</option>
+            {people
+              .filter((person) => person.id !== focus.id)
+              .map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.full_name}
+                </option>
+              ))}
+          </select>
+          <Button type="button" disabled={busy || !selectedPersonId} onClick={onSave}>
+            Bağla
+          </Button>
+        </div>
+      </div>
+
+      {error && <p className="mt-3 text-[13px] text-danger">{error}</p>}
+
+      <div className="mt-4">
+        <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-text-secondary">Doğrudan bağlar</p>
+        {directConnections.length === 0 ? (
+          <p className="mt-2 text-[13px] text-text-secondary">Henüz doğrudan bir ilişki kaydı yok.</p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {directConnections.map(({ relation, person, label }) => (
+              <li key={relation.id} className="flex items-center justify-between gap-3 rounded-[10px] border border-border-soft px-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-medium">{person.full_name}</p>
+                  <p className="text-[11px] text-text-secondary">{label}</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onRemove(relation.id)}
+                  className="shrink-0 text-[12px] font-medium text-danger hover:underline disabled:opacity-50"
+                >
+                  Bağı kaldır
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {extended.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-text-secondary">Hesaplanan akrabalıklar</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {extended.map(({ person, label }) => (
+              <span key={`${person.id}-${label}`} className="rounded-full border border-border-soft bg-bg-elevated px-2.5 py-1 text-[12px] text-text-secondary">
+                {person.full_name} · {label}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

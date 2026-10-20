@@ -10,6 +10,7 @@ export type Profile = {
 export type Village = {
   id: string;
   name: string;
+  name_tr: string | null;
   slug: string;
   description: string | null;
   created_by: string | null;
@@ -17,6 +18,42 @@ export type Village = {
   updated_at: string;
   deleted_at: string | null;
   family_count?: number;
+};
+
+export const heritageEntryTypes = [
+  "region",
+  "city",
+  "district",
+  "village",
+  "hamlet",
+  "monument",
+  "historic_site",
+  "event",
+  "story",
+  "quote",
+  "cultural_practice",
+  "person",
+] as const;
+
+export type HeritageEntryType = (typeof heritageEntryTypes)[number];
+
+export type HeritageEntry = {
+  id: string;
+  entry_type: HeritageEntryType;
+  title: string;
+  title_tr: string | null;
+  slug: string;
+  summary: string | null;
+  content: string | null;
+  location_text: string | null;
+  year_start: number | null;
+  year_end: number | null;
+  source_note: string | null;
+  parent_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
 };
 
 export type Family = {

@@ -26,12 +26,14 @@ function useHdDpr() {
 export function VillageAtlas({
   villageId,
   villageName,
+  villageAlternateName,
   families,
   fullscreen = false,
   topSlot,
 }: {
   villageId: string;
   villageName?: string;
+  villageAlternateName?: string | null;
   families: Family[];
   fullscreen?: boolean;
   topSlot?: React.ReactNode;
@@ -194,9 +196,12 @@ export function VillageAtlas({
           <div className="space-y-2">
             {topSlot}
             {villageName && (
-              <p className="rounded-full border border-border-soft/80 bg-white/90 px-3.5 py-1.5 text-[14px] font-semibold tracking-[-0.02em] text-text shadow-sm backdrop-blur-xl">
-                {villageName}
-              </p>
+              <div className="rounded-[16px] border border-border-soft/80 bg-white/90 px-3.5 py-2 shadow-sm backdrop-blur-xl">
+                <p className="text-[14px] font-semibold tracking-[-0.02em] text-text">{villageName}</p>
+                {villageAlternateName && (
+                  <p className="mt-0.5 text-[11px] font-medium text-text-secondary">{villageAlternateName}</p>
+                )}
+              </div>
             )}
           </div>
           <div className="flex flex-col items-end gap-2">

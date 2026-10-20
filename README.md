@@ -1,12 +1,12 @@
 # RootVillage
 
-Köy hafızasını görünür kıl — aileler, atalar ve anılar için kültürel miras uygulaması.
+Kürdistan’ın yerlerini, soylarını, anlatılarını ve kültürel mirasını birlikte kayda geçiren ortak hafıza platformu.
 
-- Herkes okur
-- Ekleme / düzenleme / yorum → Google ile giriş
-- Çoklu köy, aile, kişi, yorum, silme önerileri
-- PWA (Ana ekrana ekle)
-- Titanyum-beyaz, hızlı Next.js + Supabase
+- Köy → aile → kişi → akrabalık haritası
+- Bölge, şehir, mezra, yapı, tarihî olay, hikâye, alıntı ve kültürel öğeler için Hafıza Arşivi
+- Yerel/Kürtçe ana ad ile isteğe bağlı Türkçe karşılık
+- Herkes okur; ekleme ve düzenleme için Google ile giriş
+- PWA, Next.js + Supabase
 
 ## Kurulum
 
@@ -22,7 +22,10 @@ Supabase Dashboard → SQL Editor → sırayla çalıştır:
 
 1. `supabase/migrations/001_init.sql`
 2. `supabase/migrations/002_clan_atlas.sql` (atlas ada konumları)
-3. `supabase/migrations/003_person_avatar.sql` (kisi foto + storage bucket)
+3. `supabase/migrations/002_profile_name_meta.sql` (profil adı meta verisi)
+4. `supabase/migrations/003_person_avatar.sql` (kişi foto + storage bucket)
+5. `supabase/migrations/004_heritage_archive.sql` (hafıza arşivi + çift adlı köyler)
+6. `supabase/migrations/005_relation_integrity.sql` (soy ağacı döngü ve yinelenen eş bağlantısı koruması)
 
 ### 2) Google Auth
 

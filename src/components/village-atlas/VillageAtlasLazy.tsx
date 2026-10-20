@@ -19,12 +19,14 @@ const VillageAtlas = dynamic(
 export function VillageAtlasLazy({
   villageId,
   villageName,
+  villageAlternateName,
   families,
   fullscreen,
   topSlot,
 }: {
   villageId: string;
   villageName?: string;
+  villageAlternateName?: string | null;
   families: Family[];
   fullscreen?: boolean;
   topSlot?: React.ReactNode;
@@ -33,6 +35,7 @@ export function VillageAtlasLazy({
     <VillageAtlas
       villageId={villageId}
       villageName={villageName}
+      villageAlternateName={villageAlternateName}
       families={families}
       fullscreen={fullscreen}
       topSlot={topSlot}

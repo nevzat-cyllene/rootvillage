@@ -157,6 +157,59 @@ select {
   background: linear-gradient(90deg, transparent, var(--border), transparent);
 }
 
+.heritage-hero {
+  isolation: isolate;
+  border: 1px solid rgba(91, 107, 124, 0.18);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(243, 247, 242, 0.92)),
+    linear-gradient(90deg, transparent 0, transparent 49.5%, rgba(91, 107, 124, 0.055) 50%, transparent 50.5%);
+  box-shadow: 0 20px 60px rgba(45, 63, 51, 0.08);
+}
+
+.heritage-orb {
+  position: absolute;
+  z-index: -1;
+  border-radius: 999px;
+  filter: blur(4px);
+  pointer-events: none;
+}
+
+.heritage-orb-one {
+  top: -200px;
+  right: -160px;
+  width: 460px;
+  height: 460px;
+  background: radial-gradient(circle, rgba(91, 107, 124, 0.16), transparent 68%);
+}
+
+.heritage-orb-two {
+  bottom: -180px;
+  left: 20%;
+  width: 420px;
+  height: 280px;
+  background: radial-gradient(ellipse, rgba(156, 123, 81, 0.12), transparent 70%);
+}
+
+.heritage-path-card {
+  min-height: 150px;
+  border: 1px solid rgba(91, 107, 124, 0.14);
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(10px);
+}
+
+.heritage-path-card:hover {
+  border-color: rgba(91, 107, 124, 0.38);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.heritage-entry-surface {
+  background:
+    linear-gradient(160deg, rgba(243, 247, 242, 0.9), rgba(255, 255, 255, 0.98) 48%),
+    var(--bg-surface);
+}
+
 /* Atlas canvas: prevent page scroll while interacting on mobile */
 .atlas-touch-lock {
   overscroll-behavior: none;

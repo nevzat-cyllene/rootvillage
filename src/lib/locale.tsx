@@ -15,6 +15,7 @@ const STORAGE_KEY = "rv_locale";
 
 const messages = {
   tr: {
+    "nav.archive": "Arşiv",
     "nav.villages": "Köyler",
     "nav.signIn": "Giriş",
     "menu.account": "Hesabım",
@@ -46,6 +47,7 @@ const messages = {
     "account.signInRequired": "Bu sayfa için giriş yapmalısın.",
   },
   en: {
+    "nav.archive": "Archive",
     "nav.villages": "Villages",
     "nav.signIn": "Sign in",
     "menu.account": "Account",

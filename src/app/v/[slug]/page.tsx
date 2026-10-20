@@ -33,6 +33,7 @@ export default async function VillagePage({
     <VillageWorkspace
       villageId={village.id}
       villageName={village.name}
+      villageTurkishName={village.name_tr}
       families={families}
     />
   );

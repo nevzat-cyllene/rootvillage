@@ -13,10 +13,12 @@ type Tab = "atlas" | "list";
 export function VillageWorkspace({
   villageId,
   villageName,
+  villageTurkishName,
   families,
 }: {
   villageId: string;
   villageName: string;
+  villageTurkishName?: string | null;
   families: Family[];
 }) {
   const [tab, setTab] = useState<Tab>("atlas");
@@ -57,6 +59,7 @@ export function VillageWorkspace({
       <VillageAtlasLazy
         villageId={villageId}
         villageName={villageName}
+        villageAlternateName={villageTurkishName}
         families={families}
         fullscreen
         topSlot={tabs}

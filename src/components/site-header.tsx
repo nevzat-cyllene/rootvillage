@@ -24,6 +24,12 @@ export function SiteHeader() {
         </Link>
         <nav className="flex items-center gap-1 sm:gap-2">
           <Link
+            href="/archive"
+            className="pressable rounded-full px-2.5 py-1.5 text-[13px] font-medium text-text-secondary hover:text-text sm:px-3"
+          >
+            {t("nav.archive")}
+          </Link>
+          <Link
             href="/villages"
             className="pressable rounded-full px-3 py-1.5 text-[13px] font-medium text-text-secondary hover:text-text"
           >
