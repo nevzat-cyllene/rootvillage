@@ -1,4 +1,4 @@
-const CACHE = "rootvillage-shell-v1";
+const CACHE = "diwan-shell-v1";
 const SHELL = ["/", "/villages", "/manifest.webmanifest", "/icons/icon.svg"];
 
 self.addEventListener("install", (event) => {

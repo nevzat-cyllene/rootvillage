@@ -80,8 +80,8 @@ export default async function FamilyPage({
         actions={
           <>
             <ShareButton
-              title={`${family.name} ailesi · RootVillage`}
-              text={`“${family.name}” aile kaydı · RootVillage`}
+              title={`${family.name} ailesi · Dîwan`}
+              text={`“${family.name}” aile kaydı · Dîwan`}
               label="Aileyi paylaş"
             />
             <DisputeToggle table="families" id={family.id} disputed={family.disputed} />

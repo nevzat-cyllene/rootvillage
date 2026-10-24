@@ -1,7 +1,7 @@
 {
-  "name": "RootVillage",
-  "short_name": "RootVillage",
-  "description": "Köy hafızasını görünür kıl — aileler, atalar, anılar.",
+  "name": "Dîwan",
+  "short_name": "Dîwan",
+  "description": "Yerlerin, ailelerin ve anlatıların ortak hafızası.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fafafa",

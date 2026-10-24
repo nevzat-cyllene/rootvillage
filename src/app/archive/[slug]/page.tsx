@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CommentsPanel } from "@/components/comments-panel";
 import { Badge, PageHeader, Surface } from "@/components/ui";
-import { getHeritageEntryBySlug } from "@/lib/data";
+import { getComments, getHeritageEntryBySlug } from "@/lib/data";
 import { heritageLabel } from "@/lib/heritage";
 
 export const revalidate = 30;
@@ -16,7 +17,7 @@ export async function generateMetadata({
   if (!entry) return { title: "Kayıt bulunamadı" };
   return {
     title: entry.title,
-    description: entry.summary ?? `${entry.title} · RootVillage Hafıza Arşivi`,
+    description: entry.summary ?? `${entry.title} · Dîwan Hafıza Arşivi`,
   };
 }
 
@@ -28,6 +29,7 @@ export default async function HeritageEntryPage({
   const { slug } = await params;
   const entry = await getHeritageEntryBySlug(slug);
   if (!entry) notFound();
+  const comments = await getComments("heritage", entry.id);
 
   const dates =
     entry.year_start || entry.year_end
@@ -67,6 +69,15 @@ export default async function HeritageEntryPage({
           </p>
         </Surface>
       )}
+
+      <CommentsPanel
+        targetType="heritage"
+        targetId={entry.id}
+        initialComments={comments}
+        title="Tanıklıklar ve kaynak notları"
+        description="Bu kaydı başka bir kaynağa, aile anlatısına veya yerel hatıraya dayandırabilirsiniz."
+        placeholder="Örn: Bu anlatıyı X kişisinden dinledim; kaynak veya farklı bir ayrıntı ekle…"
+      />
     </div>
   );
 }

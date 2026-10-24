@@ -30,13 +30,13 @@ export default async function HomePage() {
             Ortak bellek · canlı arşiv
           </p>
           <h1 className="max-w-4xl text-[40px] font-semibold leading-[1.02] tracking-[-0.05em] text-text sm:text-[62px]">
-            Kürdistan’ın hafızasını
+            Bu coğrafyanın hafızasını
             <br />
             birlikte görünür kıl.
           </h1>
           <p className="mt-6 max-w-2xl text-[17px] leading-relaxed text-text-secondary sm:text-[19px]">
-            RootVillage; köyleri ve sülaleleri korurken, bölgeleri, şehirleri, tarihsel olayları,
-            anlatıları ve kültürel mirası birlikte kayda geçiren yaşayan bir hafıza alanı.
+            Dîwan; köyleri ve sülaleleri korurken, yerel tarihleri, anlatıları ve kültürel mirası
+            birlikte kayda geçiren yaşayan bir hafıza alanı.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link href="/archive">

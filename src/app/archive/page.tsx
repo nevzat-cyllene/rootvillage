@@ -17,9 +17,9 @@ export default async function ArchivePage({
   return (
     <div>
       <PageHeader
-        eyebrow="RootVillage · ortak bellek"
+        eyebrow="Dîwan · ortak bellek"
         title="Hafıza Arşivi"
-        description="Kürdistan’ın yerlerini, tarihsel olaylarını, anlatılarını ve kültürel mirasını birlikte kayda geçiriyoruz."
+        description="Yerleri, tarihsel olayları, anlatıları ve kültürel mirası birlikte kayda geçiriyoruz."
         actions={
           <Link href="#yeni">
             <Button>Yeni kayıt ekle</Button>

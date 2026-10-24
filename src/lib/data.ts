@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type {
   Comment,
+  CommentTarget,
   EditProposal,
   Family,
   HeritageEntry,
@@ -188,7 +189,7 @@ export async function getRelationsForPeople(
 }
 
 export async function getComments(
-  targetType: "village" | "family" | "person",
+  targetType: CommentTarget,
   targetId: string,
 ): Promise<Comment[]> {
   const supabase = await createClient();

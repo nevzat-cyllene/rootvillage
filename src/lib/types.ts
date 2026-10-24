@@ -97,7 +97,7 @@ export type PersonRelation = {
   relation_type: "parent" | "spouse";
 };
 
-export type CommentTarget = "village" | "family" | "person";
+export type CommentTarget = "village" | "family" | "person" | "heritage";
 
 export type Comment = {
   id: string;

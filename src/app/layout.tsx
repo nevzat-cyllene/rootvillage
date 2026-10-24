@@ -11,16 +11,16 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "RootVillage",
-    template: "%s · RootVillage",
+    default: "Dîwan",
+    template: "%s · Dîwan",
   },
   description:
-    "Köy hafızasını görünür kıl. Aileler, atalar ve anılar için ortak bir bellek.",
-  applicationName: "RootVillage",
+    "Yerlerin, ailelerin ve anlatıların ortak hafızası.",
+  applicationName: "Dîwan",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "RootVillage",
+    title: "Dîwan",
   },
   formatDetection: {
     telephone: false,

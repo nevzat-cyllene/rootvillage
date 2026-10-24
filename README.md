@@ -1,6 +1,6 @@
-# RootVillage
+# Dîwan
 
-Kürdistan’ın yerlerini, soylarını, anlatılarını ve kültürel mirasını birlikte kayda geçiren ortak hafıza platformu.
+Yerlerin, soyların, anlatıların ve kültürel mirasın birlikte kayda geçtiği ortak hafıza platformu.
 
 - Köy → aile → kişi → akrabalık haritası
 - Bölge, şehir, mezra, yapı, tarihî olay, hikâye, alıntı ve kültürel öğeler için Hafıza Arşivi
@@ -26,6 +26,7 @@ Supabase Dashboard → SQL Editor → sırayla çalıştır:
 4. `supabase/migrations/003_person_avatar.sql` (kişi foto + storage bucket)
 5. `supabase/migrations/004_heritage_archive.sql` (hafıza arşivi + çift adlı köyler)
 6. `supabase/migrations/005_relation_integrity.sql` (soy ağacı döngü ve yinelenen eş bağlantısı koruması)
+7. `supabase/migrations/006_heritage_comments.sql` (arşiv kayıtlarına tanıklık ve kaynak notu yorumları)
 
 ### 2) Google Auth
 

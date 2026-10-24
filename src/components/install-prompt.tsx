@@ -57,7 +57,7 @@ export function InstallPrompt() {
     <div className="fixed inset-x-0 bottom-0 z-50 p-4 animate-fade-up">
       <div className="mx-auto flex max-w-lg items-start gap-3 rounded-[18px] border border-border-soft bg-bg-surface/95 p-4 shadow-[0_12px_40px_rgba(0,0,0,0.12)] backdrop-blur-xl">
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-semibold tracking-[-0.02em]">RootVillage’ı yükle</p>
+          <p className="text-[14px] font-semibold tracking-[-0.02em]">Dîwan’ı yükle</p>
           <p className="mt-1 text-[13px] leading-snug text-text-secondary">
             {isIos && !deferred
               ? "Safari’de Paylaş → Ana Ekrana Ekle ile telefonuna kur."

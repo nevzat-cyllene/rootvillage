@@ -6,11 +6,12 @@ $migrations = @(
   "002_profile_name_meta.sql",
   "003_person_avatar.sql",
   "004_heritage_archive.sql",
-  "005_relation_integrity.sql"
+  "005_relation_integrity.sql",
+  "006_heritage_comments.sql"
 )
 
 Write-Host ""
-Write-Host "RootVillage — Supabase migrations" -ForegroundColor Cyan
+Write-Host "Dîwan — Supabase migrations" -ForegroundColor Cyan
 Write-Host "1) Open Supabase Dashboard > SQL Editor"
 Write-Host "2) Run these files in order:"
 foreach ($migration in $migrations) {
@@ -20,7 +21,7 @@ Write-Host "3) Auth > Providers > Google: enable"
 Write-Host "4) Redirect: http://localhost:3000/auth/callback (+ Vercel URL)"
 Write-Host ""
 
-$latest = Join-Path $root "supabase\migrations\005_relation_integrity.sql"
+$latest = Join-Path $root "supabase\migrations\006_heritage_comments.sql"
 if (Test-Path $latest) {
   Invoke-Item $latest
 } else {

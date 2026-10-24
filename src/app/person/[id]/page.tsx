@@ -73,8 +73,8 @@ export default async function PersonPage({
         actions={
           <>
             <ShareButton
-              title={`${person.full_name} · RootVillage`}
-              text={`${person.full_name} hakkında RootVillage kaydı`}
+              title={`${person.full_name} · Dîwan`}
+              text={`${person.full_name} hakkında Dîwan kaydı`}
             />
             <DisputeToggle table="people" id={person.id} disputed={person.disputed} />
             <SoftDeleteButton table="people" id={person.id} />

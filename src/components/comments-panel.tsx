@@ -12,10 +12,16 @@ export function CommentsPanel({
   targetType,
   targetId,
   initialComments,
+  title = "Notlar",
+  description = "Düzeltme, bağlam veya dönem bilgisi ekleyin.",
+  placeholder,
 }: {
   targetType: CommentTarget;
   targetId: string;
   initialComments: Comment[];
+  title?: string;
+  description?: string;
+  placeholder?: string;
 }) {
   const { user, requireAuth } = useAuth();
   const router = useRouter();
@@ -60,9 +66,9 @@ export function CommentsPanel({
     <section className="mt-10 animate-fade-up">
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
-          <h2 className="text-[20px] font-semibold tracking-[-0.03em]">Notlar</h2>
+          <h2 className="text-[20px] font-semibold tracking-[-0.03em]">{title}</h2>
           <p className="mt-1 text-[13px] text-text-secondary">
-            Düzeltme, bağlam veya dönem bilgisi ekleyin.
+            {description}
           </p>
         </div>
       </div>
@@ -73,9 +79,10 @@ export function CommentsPanel({
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder={
-              user
+              placeholder ??
+              (user
                 ? "Örn: Bu aile 1950’lerde X mahallesinde otururdu…"
-                : "Kısa bir not veya düzeltme bırak…"
+                : "Kısa bir not veya düzeltme bırak…")
             }
           />
           {error && <p className="text-[13px] text-danger">{error}</p>}

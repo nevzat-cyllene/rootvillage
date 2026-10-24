@@ -25,7 +25,7 @@ export function Logo({
             <stop offset="0.45" stopColor="#D2D2D7" />
             <stop offset="1" stopColor="#8E8E93" />
           </linearGradient>
-          <linearGradient id="rvInk" x1="18" y1="16" x2="46" y2="48" gradientUnits="userSpaceOnUse">
+          <linearGradient id="diwanInk" x1="18" y1="16" x2="46" y2="48" gradientUnits="userSpaceOnUse">
             <stop stopColor="#1D1D1F" />
             <stop offset="1" stopColor="#5B6B7C" />
           </linearGradient>
@@ -33,7 +33,7 @@ export function Logo({
         <circle cx="32" cy="32" r="29" stroke="url(#rvSteel)" strokeWidth="2.5" fill="#FFFFFF" />
         <path
           d="M32 14c0 8-6 12-6 20 0 5 2.5 8 6 10 3.5-2 6-5 6-10 0-8-6-12-6-20Z"
-          fill="url(#rvInk)"
+          fill="url(#diwanInk)"
           opacity="0.92"
         />
         <path
@@ -43,10 +43,13 @@ export function Logo({
           strokeLinecap="round"
         />
         <circle cx="32" cy="20" r="2.2" fill="#FAFAFA" />
+        <circle cx="23" cy="34" r="2.2" fill="#E7BD48" opacity="0.9" />
+        <circle cx="32" cy="38" r="2.2" fill="#BB5656" opacity="0.72" />
+        <circle cx="41" cy="34" r="2.2" fill="#5D8A67" opacity="0.76" />
       </svg>
       {!markOnly && (
         <span className="text-[17px] font-semibold tracking-[-0.03em] text-text">
-          RootVillage
+          Dîwan
         </span>
       )}
     </span>
