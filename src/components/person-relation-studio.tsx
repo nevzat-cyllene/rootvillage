@@ -30,6 +30,11 @@ type PersonDraft = {
   avatarFile: File | null;
 };
 
+type PersonSearchOption = Pick<Person, "id" | "full_name" | "gender" | "family_id"> & {
+  familyName?: string | null;
+  villageName?: string | null;
+};
+
 const emptyDraft = (): PersonDraft => ({
   full_name: "",
   birth_year: "",
@@ -84,10 +89,12 @@ function defaultGenderForRole(role: AddRole, focus: Person | null): Gender {
 export function PersonRelationStudio({
   familyId,
   people,
+  homePeople = people,
   relations,
 }: {
   familyId: string;
   people: Person[];
+  homePeople?: Person[];
   relations: PersonRelation[];
 }) {
   const router = useRouter();
@@ -103,12 +110,29 @@ export function PersonRelationStudio({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pulse, setPulse] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
     if (!focusId || !people.some((p) => p.id === focusId)) {
-      setFocusId(pickDefaultFocus(people));
+      setFocusId(pickDefaultFocus(homePeople.length > 0 ? homePeople : people));
     }
-  }, [people, focusId]);
+  }, [people, homePeople, focusId]);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !addRole && !editOpen && !connectionsOpen) {
+        setFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [fullscreen, addRole, editOpen, connectionsOpen]);
 
   const focus = people.find((p) => p.id === focusId) ?? null;
   const links = useMemo(
@@ -165,8 +189,7 @@ export function PersonRelationStudio({
 
   async function connectExistingPerson() {
     if (!focus || !connectionPersonId) return;
-    const selected = people.find((person) => person.id === connectionPersonId);
-    if (!selected || selected.id === focus.id) {
+    if (connectionPersonId === focus.id) {
       setError("Bağlanacak geçerli bir kişi seçin.");
       return;
     }
@@ -193,25 +216,25 @@ export function PersonRelationStudio({
     }> = [];
 
     if (connectionRole === "parent") {
-      if (wouldCreateParentCycle(focus.id, selected.id, relations)) {
+      if (wouldCreateParentCycle(focus.id, connectionPersonId, relations)) {
         setBusy(false);
         setError("Bu ebeveyn bağlantısı soy ağacında döngü oluşturur.");
         return;
       }
       pending.push({
         person_id: focus.id,
-        related_person_id: selected.id,
+        related_person_id: connectionPersonId,
         relation_type: "parent",
         created_by: user.id,
       });
     } else if (connectionRole === "child") {
-      if (wouldCreateParentCycle(selected.id, focus.id, relations)) {
+      if (wouldCreateParentCycle(connectionPersonId, focus.id, relations)) {
         setBusy(false);
         setError("Bu çocuk bağlantısı soy ağacında döngü oluşturur.");
         return;
       }
       pending.push({
-        person_id: selected.id,
+        person_id: connectionPersonId,
         related_person_id: focus.id,
         relation_type: "parent",
         created_by: user.id,
@@ -220,8 +243,8 @@ export function PersonRelationStudio({
       const alreadySpouses = relations.some(
         (relation) =>
           relation.relation_type === "spouse" &&
-          ((relation.person_id === focus.id && relation.related_person_id === selected.id) ||
-            (relation.person_id === selected.id && relation.related_person_id === focus.id)),
+          ((relation.person_id === focus.id && relation.related_person_id === connectionPersonId) ||
+            (relation.person_id === connectionPersonId && relation.related_person_id === focus.id)),
       );
       if (alreadySpouses) {
         setBusy(false);
@@ -230,7 +253,7 @@ export function PersonRelationStudio({
       }
       pending.push({
         person_id: focus.id,
-        related_person_id: selected.id,
+        related_person_id: connectionPersonId,
         relation_type: "spouse",
         created_by: user.id,
       });
@@ -246,13 +269,13 @@ export function PersonRelationStudio({
       for (const parentId of parentIds) {
         const alreadyLinked = relations.some(
           (relation) =>
-            relation.person_id === selected.id &&
+            relation.person_id === connectionPersonId &&
             relation.related_person_id === parentId &&
             relation.relation_type === "parent",
         );
         if (!alreadyLinked) {
           pending.push({
-            person_id: selected.id,
+            person_id: connectionPersonId,
             related_person_id: parentId,
             relation_type: "parent",
             created_by: user.id,
@@ -335,7 +358,7 @@ export function PersonRelationStudio({
     const { data: created, error: err } = await supabase
       .from("people")
       .insert({
-        family_id: familyId,
+        family_id: focus.family_id || familyId,
         ...payload,
         created_by: user.id,
       })
@@ -410,10 +433,22 @@ export function PersonRelationStudio({
     }
 
     if (rels.length) {
-      await supabase.from("person_relations").insert(rels);
+      const { error: relationError } = await supabase.from("person_relations").insert(rels);
+      if (relationError) {
+        await supabase
+          .from("people")
+          .update({ deleted_at: new Date().toISOString() })
+          .eq("id", created.id);
+        setBusy(false);
+        setError(`Kişi oluşturuldu ancak bağ kurulamadı: ${relationError.message}`);
+        return;
+      }
     }
 
-    await supabase.from("families").update({ is_incomplete: false }).eq("id", familyId);
+    await supabase
+      .from("families")
+      .update({ is_incomplete: false })
+      .eq("id", focus.family_id || familyId);
 
     setBusy(false);
     setDraft(emptyDraft());
@@ -471,19 +506,64 @@ export function PersonRelationStudio({
   const extraSpouses = links?.spouses.slice(1) ?? [];
   const focusSiblings = links?.siblings ?? [];
   const spouseSiblings = spouseLinks?.siblings ?? [];
-  const focusFanSide: "left" | "right" = spouseLeft ? "right" : "left";
 
   return (
-    <section className="mb-10 animate-fade-up">
-      <div className="mb-4">
-        <h2 className="text-[20px] font-semibold tracking-[-0.03em]">İlişki haritası</h2>
-        <p className="mt-1 text-[13px] text-text-secondary">
-          Üstte odak kişinin ebeveynleri, ortada çift ve yanlarında kardeş fan’ı, altta çocuklar.
-          Eşe tıklayınca odak değişir.
-        </p>
-      </div>
+    <section
+      className={cn(
+        "kinship-studio animate-fade-up",
+        fullscreen
+          ? "fixed inset-0 z-[70] overflow-y-auto bg-[#EEF4F8] p-3 sm:p-5"
+          : "relative mb-10",
+      )}
+    >
+      <div className={cn("mx-auto", fullscreen && "max-w-[1600px]")}>
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="mb-1 flex items-center gap-2">
+              <span className="kinship-live-dot" aria-hidden />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#286F61]">
+                Canlı soy ağı
+              </p>
+            </div>
+            <h2 className="text-[24px] font-semibold tracking-[-0.04em] sm:text-[28px]">İlişki haritası</h2>
+            <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+              Bir kişiyi merkeze al; yalnızca ebeveyn ve eş bağlarını kur. Kardeş, teyze, kuzen ve yeğen
+              gibi akrabalıklar otomatik hesaplanır.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="kinship-focus-picker">
+              <span>Odak</span>
+              <select value={focusId ?? ""} onChange={(event) => setFocusId(event.target.value)}>
+                {people.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.full_name}
+                    {person.family_id !== familyId ? " · başka aile" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              type="button"
+              variant="secondary"
+              className="!px-3.5 !py-2 text-[12px]"
+              onClick={() => setFullscreen((value) => !value)}
+            >
+              <FullscreenIcon />
+              {fullscreen ? "Küçült" : "Tam ekran"}
+            </Button>
+          </div>
+        </div>
 
-      <div className="overflow-x-auto overflow-y-hidden rounded-[20px] border border-border-soft bg-[linear-gradient(165deg,#f7f8fa_0%,#eef1f4_48%,#fafafa_100%)] p-4 sm:p-6">
+        <div
+          className={cn(
+            "kinship-canvas relative overflow-x-auto overflow-y-hidden rounded-[24px] border border-white/80 p-4 sm:p-7",
+            fullscreen ? "min-h-[calc(100dvh-150px)]" : "min-h-[590px]",
+          )}
+        >
+          <div className="kinship-orb kinship-orb-one" aria-hidden />
+          <div className="kinship-orb kinship-orb-two" aria-hidden />
+          <div className="relative z-[1] flex min-h-[540px] flex-col justify-center">
         {/* Parents of focus only */}
         <TreeBand label="Ebeveynler">
           {(links?.parents ?? []).map((p) => (
@@ -498,31 +578,11 @@ export function PersonRelationStudio({
           Kişi ve eş
         </div>
 
-        <div className="mx-auto flex w-max max-w-none items-center justify-center gap-1 px-2 sm:gap-2">
-          {focusFanSide === "left" && (
-            <SiblingFan
-              side="left"
-              siblings={focusSiblings}
-              onSelect={setFocusId}
-              onAdd={() => openAdd("sibling")}
-            />
-          )}
-          {spouseLeft && primarySpouse && (
-            <SiblingFan
-              side="left"
-              siblings={spouseSiblings}
-              onSelect={setFocusId}
-              onAdd={() => {
-                setFocusId(primarySpouse.id);
-                openAdd("sibling");
-              }}
-            />
-          )}
-
+        <div className="mx-auto flex w-full flex-col items-center justify-center gap-3 px-2 sm:w-max sm:flex-row sm:items-stretch">
           <div
             className={cn(
-              "relative z-10 flex items-stretch gap-3",
-              spouseLeft && "flex-row-reverse",
+              "relative z-10 flex flex-col items-center gap-3 sm:flex-row sm:items-stretch",
+              spouseLeft && "sm:flex-row-reverse",
             )}
           >
             {focus && (
@@ -546,23 +606,25 @@ export function PersonRelationStudio({
             )}
           </div>
 
-          {!spouseLeft && primarySpouse && (
-            <SiblingFan
-              side="right"
+        </div>
+
+        <div className="mx-auto mt-5 grid max-w-3xl gap-2 sm:grid-cols-2">
+          <SiblingRail
+            label={`${focus?.full_name ?? "Kişi"} · kardeşler`}
+            siblings={focusSiblings}
+            onSelect={setFocusId}
+            onAdd={() => openAdd("sibling")}
+          />
+          {primarySpouse && (
+            <SiblingRail
+              label={`${primarySpouse.full_name} · kardeşler`}
               siblings={spouseSiblings}
               onSelect={setFocusId}
               onAdd={() => {
                 setFocusId(primarySpouse.id);
-                openAdd("sibling");
+                setAddRole("sibling");
+                setDraft(emptyDraft());
               }}
-            />
-          )}
-          {focusFanSide === "right" && (
-            <SiblingFan
-              side="right"
-              siblings={focusSiblings}
-              onSelect={setFocusId}
-              onAdd={() => openAdd("sibling")}
             />
           )}
         </div>
@@ -589,24 +651,8 @@ export function PersonRelationStudio({
           <AddChip label="+ Çocuk" onClick={() => openAdd("child")} />
         </TreeBand>
 
-        <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
-          {people.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setFocusId(p.id)}
-              className={cn(
-                "pressable shrink-0 rounded-full border px-3 py-1.5 text-[12px] font-medium",
-                p.id === focusId
-                  ? "border-text bg-text text-white"
-                  : "border-border-soft bg-bg-surface text-text-secondary hover:text-text",
-              )}
-            >
-              {p.full_name}
-            </button>
-          ))}
+          </div>
         </div>
-      </div>
 
       {connectionsOpen && focus && (
         <ConnectionSheet
@@ -660,6 +706,7 @@ export function PersonRelationStudio({
           saveLabel="Güncelle"
         />
       )}
+      </div>
     </section>
   );
 }
@@ -699,34 +746,48 @@ function HeroPersonCard({
   const isFocus = variant === "focus";
   const genderRing =
     person.gender === "female"
-      ? "ring-[var(--gender-female)]/40"
+      ? "border-[#E9A7BC] bg-[linear-gradient(155deg,#FFF8FB_0%,#FFF0F5_100%)] ring-[#D76B91]/30"
       : person.gender === "male"
-        ? "ring-[var(--gender-male)]/40"
-        : "ring-border-soft";
+        ? "border-[#A8C9EE] bg-[linear-gradient(155deg,#F8FBFF_0%,#EDF6FF_100%)] ring-[#4D8ED8]/30"
+        : "border-border-soft bg-bg-surface ring-border-soft";
+  const focusTheme = person.gender === "female"
+    ? "border-[#B94772] bg-[linear-gradient(145deg,#A93663_0%,#702442_100%)] shadow-[0_20px_48px_rgba(151,48,88,0.3)]"
+    : person.gender === "male"
+      ? "border-[#2F6EAE] bg-[linear-gradient(145deg,#347FC4_0%,#173F70_100%)] shadow-[0_20px_48px_rgba(39,100,164,0.3)]"
+      : "border-[#27394D] bg-[linear-gradient(145deg,#31475E_0%,#172333_100%)] shadow-[0_20px_48px_rgba(20,35,51,0.28)]";
 
   const inner = (
     <>
       <div className="mb-2 flex justify-center">
         <PersonAvatar person={person} size="lg" inverted={isFocus} />
       </div>
-      <p className="text-[14px] font-semibold tracking-[-0.02em]">{person.full_name}</p>
+      <p className="line-clamp-2 min-h-[40px] text-[15px] font-semibold leading-tight tracking-[-0.03em]">{person.full_name}</p>
       <p className={cn("mt-1 text-[11px]", isFocus ? "text-white/65" : "text-text-secondary")}>
         {formatYearRange(person.birth_year, person.death_year)}
       </p>
       {person.gender && (
-        <p className={cn("mt-0.5 text-[10px]", isFocus ? "text-white/50" : "text-text-tertiary")}>
-          {genderLabel(person.gender)}
-        </p>
+        <span className={cn(
+          "mt-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold",
+          isFocus
+            ? "bg-white/14 text-white/85"
+            : person.gender === "female"
+              ? "bg-[#FAD9E4] text-[#97385C]"
+              : person.gender === "male"
+                ? "bg-[#D9EAFE] text-[#235E9E]"
+                : "bg-bg-elevated text-text-secondary",
+        )}>
+          {person.gender === "female" ? "♀ " : person.gender === "male" ? "♂ " : ""}{genderLabel(person.gender)}
+        </span>
       )}
       {isFocus && onEdit && detailHref && (
-        <div className="mt-2.5 flex justify-center gap-2">
+        <div className="mt-3 grid grid-cols-2 gap-1.5 border-t border-white/15 pt-3">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               onEdit();
             }}
-            className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium hover:bg-white/25"
+            className="min-w-0 rounded-[10px] bg-white/14 px-1.5 py-2 text-[10px] font-semibold transition hover:-translate-y-0.5 hover:bg-white/24"
           >
             Düzenle
           </button>
@@ -737,7 +798,7 @@ function HeroPersonCard({
                 e.stopPropagation();
                 onConnections();
               }}
-              className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium hover:bg-white/20"
+              className="min-w-0 rounded-[10px] bg-white/10 px-1.5 py-2 text-[10px] font-semibold transition hover:-translate-y-0.5 hover:bg-white/20"
             >
               Bağlar
             </button>
@@ -745,7 +806,7 @@ function HeroPersonCard({
           <Link
             href={detailHref}
             onClick={(e) => e.stopPropagation()}
-            className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium hover:bg-white/20"
+            className="col-span-2 min-w-0 rounded-[10px] bg-white/10 px-1.5 py-2 text-center text-[10px] font-semibold transition hover:-translate-y-0.5 hover:bg-white/20"
           >
             Sayfa
           </Link>
@@ -761,7 +822,8 @@ function HeroPersonCard({
     return (
       <div
         className={cn(
-          "relative w-[168px] rounded-[18px] border border-text bg-text px-3 py-3.5 text-center text-white shadow-[0_12px_36px_rgba(29,29,31,0.22)] transition-transform duration-300",
+          "relative w-[210px] shrink-0 rounded-[22px] border px-4 py-4 text-center text-white transition-all duration-300",
+          focusTheme,
           pulse && "scale-[1.03]",
         )}
       >
@@ -775,7 +837,7 @@ function HeroPersonCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        "pressable relative w-[168px] rounded-[18px] border border-border-soft bg-bg-surface px-3 py-3.5 text-center shadow-[0_10px_32px_rgba(0,0,0,0.08)] ring-2 transition-transform",
+        "pressable relative w-[210px] shrink-0 rounded-[22px] border px-4 py-4 text-center shadow-[0_14px_38px_rgba(30,50,70,0.12)] ring-2 transition-all hover:-translate-y-1 hover:shadow-[0_20px_46px_rgba(30,50,70,0.18)]",
         genderRing,
       )}
     >
@@ -811,6 +873,9 @@ function ConnectionSheet({
   onRemove: (relationId: string) => void;
   onCancel: () => void;
 }) {
+  const [query, setQuery] = useState("");
+  const [remoteOptions, setRemoteOptions] = useState<PersonSearchOption[]>([]);
+  const [searching, setSearching] = useState(false);
   const byId = new Map(people.map((person) => [person.id, person]));
   const directConnections = relations.flatMap((relation) => {
     if (relation.relation_type === "parent" && relation.person_id === focus.id) {
@@ -836,8 +901,81 @@ function ConnectionSheet({
     spouse: "Seçilen kişi odak kişinin eşi olarak bağlanır.",
   };
 
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) {
+      setRemoteOptions([]);
+      setSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSearching(true);
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const { data } = await createClient()
+          .from("people")
+          .select("id, full_name, gender, family_id, families(name, villages(name))")
+          .is("deleted_at", null)
+          .neq("id", focus.id)
+          .ilike("full_name", `%${term.replace(/[%_,]/g, "")}%`)
+          .limit(12);
+
+        if (cancelled) return;
+        const rows = (data ?? []) as Array<{
+          id: string;
+          full_name: string;
+          gender: Person["gender"];
+          family_id: string;
+          families: {
+            name?: string | null;
+            villages?: { name?: string | null } | Array<{ name?: string | null }> | null;
+          } | Array<{
+            name?: string | null;
+            villages?: { name?: string | null } | Array<{ name?: string | null }> | null;
+          }> | null;
+        }>;
+        setRemoteOptions(rows.map((row) => {
+          const family = Array.isArray(row.families) ? row.families[0] : row.families;
+          const village = Array.isArray(family?.villages) ? family.villages[0] : family?.villages;
+          return {
+            id: row.id,
+            full_name: row.full_name,
+            gender: row.gender,
+            family_id: row.family_id,
+            familyName: family?.name ?? null,
+            villageName: village?.name ?? null,
+          };
+        }));
+        setSearching(false);
+      })();
+    }, 260);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [query, focus.id]);
+
+  const localOptions: PersonSearchOption[] = people
+    .filter((person) => person.id !== focus.id)
+    .filter((person) => !query.trim() || person.full_name.toLocaleLowerCase("tr").includes(query.trim().toLocaleLowerCase("tr")));
+  const optionMap = new Map<string, PersonSearchOption>();
+  for (const option of [...localOptions, ...remoteOptions]) optionMap.set(option.id, option);
+  const options = [...optionMap.values()].slice(0, 14);
+  const selectedOption = optionMap.get(selectedPersonId) ?? byId.get(selectedPersonId);
+
   return (
-    <div className="mt-4 animate-fade-up rounded-[16px] border border-border-soft bg-bg-surface p-4 shadow-[var(--shadow)]">
+    <div
+      className="fixed inset-0 z-[90] flex items-end justify-center bg-[#07111F]/50 p-3 backdrop-blur-md sm:items-center sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${focus.full_name} için bağ ekle`}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+    >
+      <div className="kinship-sheet-enter max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-[24px] border border-white/70 bg-white/95 p-5 shadow-[0_28px_90px_rgba(8,18,35,0.3)] sm:p-6">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[14px] font-semibold tracking-[-0.02em]">{focus.full_name} · bağlar</p>
@@ -874,24 +1012,51 @@ function ConnectionSheet({
           ))}
         </div>
         <p className="mt-2 text-[12px] text-text-secondary">{roleHelp[role]}</p>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <select
-            value={selectedPersonId}
-            onChange={(event) => onPersonChange(event.target.value)}
-            className="min-w-0 flex-1 rounded-[10px] border border-border-soft bg-bg-surface px-3 py-2 text-[13px] outline-none focus:border-accent/40 focus:ring-2 focus:ring-accent/15"
-          >
-            <option value="">Mevcut bir kişi seçin</option>
-            {people
-              .filter((person) => person.id !== focus.id)
-              .map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.full_name}
-                </option>
-              ))}
-          </select>
-          <Button type="button" disabled={busy || !selectedPersonId} onClick={onSave}>
-            Bağla
-          </Button>
+        <div className="mt-3">
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Köyde veya başka bir ailede kişi ara…"
+          />
+          <div className="mt-2 max-h-56 space-y-1 overflow-y-auto rounded-[14px] border border-border-soft bg-white p-1.5">
+            {options.map((person) => (
+              <button
+                key={person.id}
+                type="button"
+                onClick={() => onPersonChange(person.id)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-[11px] px-3 py-2 text-left transition",
+                  selectedPersonId === person.id
+                    ? "bg-[#E3F3EE] text-[#18594B] ring-1 ring-[#76B5A5]/45"
+                    : "hover:bg-bg-elevated",
+                )}
+              >
+                <PersonAvatar gender={person.gender} size="sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-semibold">{person.full_name}</span>
+                  <span className="block truncate text-[11px] text-text-secondary">
+                    {person.familyName ?? (person.family_id === focus.family_id ? "Aynı aile" : "Bağlı başka aile")}
+                    {person.villageName ? ` · ${person.villageName}` : ""}
+                  </span>
+                </span>
+                {selectedPersonId === person.id && <span aria-hidden>✓</span>}
+              </button>
+            ))}
+            {searching && <p className="px-3 py-4 text-center text-[12px] text-text-secondary">Aranıyor…</p>}
+            {!searching && options.length === 0 && (
+              <p className="px-3 py-4 text-center text-[12px] text-text-secondary">
+                En az iki harf yaz; tüm ailelerde arayalım.
+              </p>
+            )}
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <p className="min-w-0 truncate text-[12px] text-text-secondary">
+              {selectedOption ? `${selectedOption.full_name} seçildi` : "Bağlanacak kişiyi seç"}
+            </p>
+            <Button type="button" disabled={busy || !selectedPersonId} onClick={onSave}>
+              {busy ? "Bağlanıyor…" : "Bağı kur"}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -935,52 +1100,48 @@ function ConnectionSheet({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
 
-function SiblingFan({
-  side,
+function SiblingRail({
+  label,
   siblings,
   onSelect,
   onAdd,
 }: {
-  side: "left" | "right";
+  label: string;
   siblings: Person[];
   onSelect: (id: string) => void;
   onAdd: () => void;
 }) {
-  const visible = siblings.slice(0, 4);
-  const rest = siblings.length - visible.length;
-
   return (
-    <div className="sibling-fan" data-side={side}>
-      {visible.map((p) => (
+    <div className="rounded-[16px] border border-white/80 bg-white/62 p-2.5 shadow-[0_8px_24px_rgba(35,62,82,0.06)] backdrop-blur-lg">
+      <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-text-tertiary">{label}</p>
+      <div className="mt-2 flex min-h-10 items-center gap-1.5 overflow-x-auto pb-1">
+        {siblings.length === 0 && (
+          <span className="px-1 text-[11px] text-text-secondary">Henüz kayıt yok</span>
+        )}
+        {siblings.map((person) => (
+          <button
+            key={person.id}
+            type="button"
+            className="pressable flex shrink-0 items-center gap-2 rounded-full border border-border-soft bg-white px-2 py-1.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-border"
+            onClick={() => onSelect(person.id)}
+          >
+            <PersonAvatar person={person} size="sm" />
+            <span className="max-w-[120px] truncate text-[11px] font-semibold">{person.full_name}</span>
+          </button>
+        ))}
         <button
-          key={p.id}
           type="button"
-          className="sibling-fan-item pressable w-[108px] shrink-0 rounded-[14px] border border-border-soft bg-bg-surface/95 px-2 py-2 text-center shadow-[var(--shadow)]"
-          onClick={() => onSelect(p.id)}
-          title={p.full_name}
+          onClick={onAdd}
+          className="pressable shrink-0 rounded-full border border-dashed border-[#82AFA4] bg-[#EFF8F5] px-3 py-2 text-[11px] font-semibold text-[#286F61] hover:bg-[#DFF1EB]"
         >
-          <div className="mb-1 flex justify-center">
-            <PersonAvatar person={p} size="sm" />
-          </div>
-          <p className="truncate text-[11px] font-semibold tracking-[-0.02em]">{p.full_name}</p>
+          ＋ Ekle
         </button>
-      ))}
-      {rest > 0 && (
-        <span className="sibling-fan-item rounded-full bg-bg-elevated px-2 py-1 text-[10px] font-medium text-text-secondary">
-          +{rest}
-        </span>
-      )}
-      <button
-        type="button"
-        onClick={onAdd}
-        className="sibling-fan-item pressable shrink-0 rounded-[12px] border border-dashed border-border bg-white/80 px-2 py-3 text-[10px] font-medium text-text-secondary hover:text-text"
-      >
-        +
-      </button>
+      </div>
     </div>
   );
 }
@@ -1067,8 +1228,30 @@ function PersonFormSheet({
       : draft.avatar_url;
 
   return (
-    <div className="mt-4 animate-fade-up rounded-[16px] border border-border-soft bg-bg-surface p-4 shadow-[var(--shadow)]">
-      <p className="text-[14px] font-semibold tracking-[-0.02em]">{title}</p>
+    <div
+      className="fixed inset-0 z-[90] flex items-end justify-center bg-[#07111F]/50 p-3 backdrop-blur-md sm:items-center sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+    >
+      <div className="kinship-sheet-enter max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-[24px] border border-white/70 bg-white/95 p-5 shadow-[0_28px_90px_rgba(8,18,35,0.3)] sm:p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#286F61]">Kişi kaydı</p>
+          <p className="mt-1 text-[18px] font-semibold tracking-[-0.03em]">{title}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-bg-elevated text-lg text-text-secondary transition hover:bg-border-soft hover:text-text"
+          aria-label="Kapat"
+        >
+          ×
+        </button>
+      </div>
       <div className="mt-3 space-y-2.5">
         <div className="flex items-center gap-3">
           <PersonAvatar
@@ -1109,22 +1292,35 @@ function PersonFormSheet({
             inputMode="numeric"
           />
         </div>
-        <select
-          className="w-full rounded-[12px] border border-border-soft bg-bg-surface px-3.5 py-2.5 text-[15px] outline-none focus:border-accent/40 focus:ring-2 focus:ring-accent/15"
-          value={draft.gender ?? ""}
-          onChange={(e) =>
-            setDraft({
-              ...draft,
-              gender: (e.target.value || null) as Gender,
-            })
-          }
-        >
-          <option value="">Cinsiyet (isteğe bağlı)</option>
-          <option value="male">Erkek</option>
-          <option value="female">Kadın</option>
-          <option value="other">Diğer</option>
-          <option value="unknown">Bilinmiyor</option>
-        </select>
+        <div>
+          <p className="mb-2 text-[12px] font-medium text-text-secondary">Profil görünümü</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {(
+              [
+                ["female", "Kadın", "♀"],
+                ["male", "Erkek", "♂"],
+                ["other", "Diğer", "◇"],
+                ["unknown", "Bilinmiyor", "?"],
+              ] as const
+            ).map(([value, label, symbol]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setDraft({ ...draft, gender: value })}
+                className={cn(
+                  "flex items-center justify-center gap-2 rounded-[13px] border px-3 py-2.5 text-[12px] font-semibold transition",
+                  draft.gender === value && value === "female" && "border-[#D76B91] bg-[#FFF0F5] text-[#9C365D] shadow-[0_6px_20px_rgba(215,107,145,0.16)]",
+                  draft.gender === value && value === "male" && "border-[#4D8ED8] bg-[#EDF6FF] text-[#235E9E] shadow-[0_6px_20px_rgba(77,142,216,0.16)]",
+                  draft.gender === value && value !== "female" && value !== "male" && "border-accent bg-accent-soft text-accent",
+                  draft.gender !== value && "border-border-soft bg-white text-text-secondary hover:border-border hover:text-text",
+                )}
+              >
+                <span className="text-base" aria-hidden>{symbol}</span>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <Textarea
           value={draft.notes}
           onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
@@ -1140,7 +1336,16 @@ function PersonFormSheet({
           Vazgeç
         </Button>
       </div>
+      </div>
     </div>
+  );
+}
+
+function FullscreenIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden>
+      <path d="M7 3H3v4M13 3h4v4M7 17H3v-4M13 17h4v-4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 

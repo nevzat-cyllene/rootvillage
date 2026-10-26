@@ -96,6 +96,15 @@ function kinLabel(relative: Person, parent: Person): string {
   return "Ebeveynin kardeşi";
 }
 
+function genderedLabel(
+  person: Person,
+  labels: { female: string; male: string; fallback: string },
+): string {
+  if (person.gender === "female") return labels.female;
+  if (person.gender === "male") return labels.male;
+  return labels.fallback;
+}
+
 /**
  * These labels are derived from the two primary relations instead of being
  * stored separately. This keeps aunt/uncle and in-law information consistent
@@ -108,16 +117,48 @@ export function extendedLinksForPerson(
 ): ExtendedRelative[] {
   const focusLinks = linksForPerson(focusId, people, relations);
   const relatives: ExtendedRelative[] = [];
+  const push = (person: Person, label: string) => {
+    if (person.id !== focusId) relatives.push({ person, label });
+  };
+
+  for (const sibling of focusLinks.siblings) {
+    push(sibling, genderedLabel(sibling, {
+      female: "Kız kardeş",
+      male: "Erkek kardeş",
+      fallback: "Kardeş",
+    }));
+
+    const siblingLinks = linksForPerson(sibling.id, people, relations);
+    for (const child of siblingLinks.children) push(child, "Yeğen");
+    for (const spouse of siblingLinks.spouses) {
+      push(spouse, genderedLabel(spouse, {
+        female: "Yenge",
+        male: "Enişte",
+        fallback: "Kardeşinin eşi",
+      }));
+    }
+  }
 
   for (const parent of focusLinks.parents) {
     const parentLinks = linksForPerson(parent.id, people, relations);
+    for (const grandparent of parentLinks.parents) {
+      const label = grandparent.gender === "male"
+        ? "Dede"
+        : grandparent.gender === "female"
+          ? parent.gender === "female" ? "Anneanne" : parent.gender === "male" ? "Babaanne" : "Büyükanne"
+          : "Büyük ebeveyn";
+      push(grandparent, label);
+    }
     for (const sibling of parentLinks.siblings) {
-      relatives.push({ person: sibling, label: kinLabel(sibling, parent) });
+      push(sibling, kinLabel(sibling, parent));
+      const auntUncleLinks = linksForPerson(sibling.id, people, relations);
+      for (const cousin of auntUncleLinks.children) push(cousin, "Kuzen");
     }
   }
 
   for (const child of focusLinks.children) {
     const childLinks = linksForPerson(child.id, people, relations);
+    for (const grandchild of childLinks.children) push(grandchild, "Torun");
     for (const spouse of childLinks.spouses) {
       const label =
         spouse.gender === "female"
@@ -125,8 +166,20 @@ export function extendedLinksForPerson(
           : spouse.gender === "male"
             ? "Damat"
             : "Çocuğunun eşi";
-      relatives.push({ person: spouse, label });
+      push(spouse, label);
     }
+  }
+
+  for (const spouse of focusLinks.spouses) {
+    const spouseFamily = linksForPerson(spouse.id, people, relations);
+    for (const parent of spouseFamily.parents) {
+      push(parent, genderedLabel(parent, {
+        female: "Kayınvalide",
+        male: "Kayınpeder",
+        fallback: "Eşinin ebeveyni",
+      }));
+    }
+    for (const sibling of spouseFamily.siblings) push(sibling, "Eşinin kardeşi");
   }
 
   const seen = new Set<string>();

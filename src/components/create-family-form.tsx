@@ -7,7 +7,15 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function CreateFamilyForm({ villageId }: { villageId: string }) {
+export function CreateFamilyForm({
+  villageId,
+  stayOnVillage = false,
+  onCreated,
+}: {
+  villageId: string;
+  stayOnVillage?: boolean;
+  onCreated?: (familyId: string) => void;
+}) {
   const { requireAuth } = useAuth();
   const router = useRouter();
   const [name, setName] = useState("");
@@ -56,7 +64,8 @@ export function CreateFamilyForm({ villageId }: { villageId: string }) {
     setName("");
     setAka("");
     setNotes("");
-    router.push(`/family/${data.id}`);
+    onCreated?.(data.id);
+    if (!stayOnVillage) router.push(`/family/${data.id}`);
     router.refresh();
   }
 
@@ -93,7 +102,7 @@ export function CreateFamilyForm({ villageId }: { villageId: string }) {
       />
       {error && <p className="text-[13px] text-danger">{error}</p>}
       <Button type="submit" disabled={busy || !name.trim()}>
-        Aile ekle
+        {busy ? "Ocak kuruluyor…" : "Aile ocağını kur"}
       </Button>
     </form>
   );

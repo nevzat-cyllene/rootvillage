@@ -33,7 +33,7 @@ export function CreateVillageForm() {
       return;
     }
 
-    let base = slugify(name) || "koy";
+    const base = slugify(name) || "koy";
     let slug = base;
     for (let i = 0; i < 5; i++) {
       const { data, error: err } = await supabase

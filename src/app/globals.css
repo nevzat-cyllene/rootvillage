@@ -14,10 +14,10 @@
   --steel: #a1a1a6;
   --danger: #c4413a;
   --success: #2d6a4f;
-  --gender-male: #5b6b7c;
-  --gender-male-bg: #d8e0e8;
-  --gender-female: #8b6b73;
-  --gender-female-bg: #ede4e6;
+  --gender-male: #2f78bd;
+  --gender-male-bg: #dceeff;
+  --gender-female: #bd4f78;
+  --gender-female-bg: #ffe0ea;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.04);
   --radius: 14px;
   --radius-sm: 10px;
@@ -216,6 +216,127 @@ select {
   touch-action: none;
 }
 
+/* Kinship studio */
+.kinship-canvas {
+  isolation: isolate;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.58), rgba(244, 249, 252, 0.76)),
+    radial-gradient(circle at 1px 1px, rgba(60, 91, 120, 0.16) 1px, transparent 0);
+  background-size: auto, 22px 22px;
+  box-shadow:
+    0 26px 70px rgba(35, 65, 91, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.kinship-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.7), transparent 24%, transparent 72%, rgba(74, 139, 183, 0.08));
+}
+
+.kinship-orb {
+  position: absolute;
+  z-index: 0;
+  width: 360px;
+  height: 360px;
+  border-radius: 999px;
+  pointer-events: none;
+  filter: blur(18px);
+  animation: kinship-drift 10s ease-in-out infinite alternate;
+}
+
+.kinship-orb-one {
+  left: -150px;
+  top: 18%;
+  background: radial-gradient(circle, rgba(70, 157, 137, 0.2), transparent 68%);
+}
+
+.kinship-orb-two {
+  right: -120px;
+  bottom: -110px;
+  background: radial-gradient(circle, rgba(77, 142, 216, 0.19), transparent 68%);
+  animation-delay: -4s;
+}
+
+.kinship-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #2f927c;
+  box-shadow: 0 0 0 5px rgba(47, 146, 124, 0.12), 0 0 18px rgba(47, 146, 124, 0.55);
+  animation: kinship-pulse 2s ease-in-out infinite;
+}
+
+.kinship-focus-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 5px 4px 12px;
+  border: 1px solid rgba(93, 116, 137, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 8px 26px rgba(31, 57, 80, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.kinship-focus-picker > span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.kinship-focus-picker select {
+  max-width: 210px;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 28px 6px 9px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+}
+
+.kinship-sheet-enter {
+  animation: kinship-sheet-in 0.34s cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+
+@keyframes kinship-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes kinship-drift {
+  from { transform: translate3d(0, -12px, 0) scale(0.94); }
+  to { transform: translate3d(24px, 14px, 0) scale(1.08); }
+}
+
+@keyframes kinship-pulse {
+  0%, 100% { transform: scale(0.9); opacity: 0.75; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kinship-orb,
+  .kinship-live-dot,
+  .kinship-sheet-enter {
+    animation: none !important;
+  }
+}
+
 /* Immersive atlas: hide site chrome scroll chrome */
 html.atlas-immersive,
 html.atlas-immersive body {
@@ -231,6 +352,10 @@ html.atlas-immersive main {
   max-width: none;
   padding: 0 !important;
   margin: 0;
+}
+
+html.atlas-immersive .install-prompt {
+  display: none;
 }
 
 /* Sibling perspective fan */

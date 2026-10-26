@@ -11,9 +11,8 @@ import { Badge, PageHeader, Surface } from "@/components/ui";
 import {
   getComments,
   getFamilyById,
-  getPeopleByFamily,
   getPersonById,
-  getRelationsForPeople,
+  getRelationshipGraph,
 } from "@/lib/data";
 import { formatYearRange } from "@/lib/utils";
 
@@ -40,8 +39,9 @@ export default async function PersonPage({
   if (!person) notFound();
 
   const family = await getFamilyById(person.family_id);
-  const people = family ? await getPeopleByFamily(family.id) : [];
-  const relations = await getRelationsForPeople([person.id]);
+  const relationshipGraph = await getRelationshipGraph([person]);
+  const people = relationshipGraph.people;
+  const relations = relationshipGraph.relations;
   const comments = await getComments("person", person.id);
 
   const nameById = new Map(people.map((p) => [p.id, p.full_name]));

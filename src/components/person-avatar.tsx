@@ -13,8 +13,8 @@ const sizes: Record<Size, string> = {
 
 function genderTone(gender: Person["gender"], inverted?: boolean) {
   if (inverted) {
-    if (gender === "female") return "bg-[#E8D4D8]/25 ring-[#E8D4D8]/45";
-    if (gender === "male") return "bg-[#D8E0E8]/25 ring-[#D8E0E8]/45";
+    if (gender === "female") return "bg-[#FFD8E6]/22 ring-[#FFD4E3]/70";
+    if (gender === "male") return "bg-[#D8EBFF]/22 ring-[#CBE4FF]/70";
     return "bg-white/15 ring-white/20";
   }
   if (gender === "female") return "bg-[var(--gender-female-bg)] ring-[var(--gender-female)]/35";
@@ -56,9 +56,9 @@ export function PersonAvatar({
         alt={name}
         className={cn(
           sizes[size],
-          "shrink-0 rounded-full object-cover ring-2",
-          g === "female" && "ring-[var(--gender-female)]/40",
-          g === "male" && "ring-[var(--gender-male)]/40",
+          "shrink-0 rounded-full object-cover ring-[3px] shadow-[0_7px_20px_rgba(24,43,61,0.16)]",
+          g === "female" && "ring-[var(--gender-female)]/65",
+          g === "male" && "ring-[var(--gender-male)]/65",
           (!g || (g !== "female" && g !== "male")) && "ring-border-soft",
           className,
         )}
@@ -70,7 +70,7 @@ export function PersonAvatar({
     <span
       className={cn(
         sizes[size],
-        "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ring-2",
+        "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ring-[3px] shadow-[0_7px_20px_rgba(24,43,61,0.14)]",
         genderTone(g, inverted),
         className,
       )}

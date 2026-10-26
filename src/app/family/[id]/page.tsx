@@ -13,7 +13,7 @@ import {
   getComments,
   getFamilyById,
   getPeopleByFamily,
-  getRelationsForPeople,
+  getRelationshipGraph,
 } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { formatYearRange } from "@/lib/utils";
@@ -48,7 +48,8 @@ export default async function FamilyPage({
     .maybeSingle();
 
   const people = await getPeopleByFamily(family.id);
-  const relations = await getRelationsForPeople(people.map((p) => p.id));
+  const relationshipGraph = await getRelationshipGraph(people);
+  const relations = relationshipGraph.relations;
   const comments = await getComments("family", family.id);
 
   const nameById = new Map(people.map((p) => [p.id, p.full_name]));
@@ -98,7 +99,12 @@ export default async function FamilyPage({
         <Badge>{people.length} kişi</Badge>
       </div>
 
-      <PersonRelationStudio familyId={family.id} people={people} relations={relations} />
+      <PersonRelationStudio
+        familyId={family.id}
+        people={relationshipGraph.people}
+        homePeople={people}
+        relations={relations}
+      />
 
       {people.length === 0 ? (
         <EmptyState

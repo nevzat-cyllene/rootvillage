@@ -7,7 +7,7 @@ import { ClanIsland, type IslandData } from "@/components/village-atlas/ClanIsla
 import { resolveIslandPose } from "@/lib/atlas-layout";
 import { createClient } from "@/lib/supabase/client";
 import type { Family } from "@/lib/types";
-import { ContactShadows, OrbitControls, PerformanceMonitor } from "@react-three/drei";
+import { ContactShadows, Line, OrbitControls, PerformanceMonitor } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,6 +21,52 @@ function useHdDpr() {
     setDpr([1, cap]);
   }, []);
   return [dpr, setDpr] as const;
+}
+
+const CLUSTER_COLORS = ["#2F8C78", "#4D7FC4", "#A15E93", "#C67C3D", "#6D70B8", "#598763"];
+
+function KinshipPaths({ islands }: { islands: IslandData[] }) {
+  const byId = new Map(islands.map((island) => [island.id, island]));
+  const paths = islands.flatMap((island) =>
+    island.kinshipLinks.flatMap((link) => {
+      const target = byId.get(link.familyId);
+      if (!target || island.id.localeCompare(target.id) >= 0) return [];
+      const distance = Math.hypot(target.x - island.x, target.z - island.z);
+      const lift = Math.min(1.2, 0.35 + distance * 0.035);
+      const color = island.cluster != null
+        ? CLUSTER_COLORS[island.cluster % CLUSTER_COLORS.length]!
+        : "#7E93A8";
+      return [{
+        key: `${island.id}:${target.id}`,
+        points: [
+          [island.x, 0.24, island.z],
+          [(island.x + target.x) / 2, lift, (island.z + target.z) / 2],
+          [target.x, 0.24, target.z],
+        ] as Array<[number, number, number]>,
+        color,
+        strength: link.strength,
+      }];
+    }),
+  );
+
+  return (
+    <>
+      {paths.map((path) => (
+        <Line
+          key={path.key}
+          points={path.points}
+          color={path.color}
+          lineWidth={Math.min(4.5, 1.2 + path.strength * 0.75)}
+          transparent
+          opacity={path.strength > 1 ? 0.72 : 0.42}
+          dashed={path.strength === 1}
+          dashScale={2.2}
+          dashSize={0.35}
+          gapSize={0.22}
+        />
+      ))}
+    </>
+  );
 }
 
 export function VillageAtlas({
@@ -67,6 +113,12 @@ export function VillageAtlas({
           name: f.name,
           aka: f.aka,
           peopleCount: f.people_count ?? 0,
+          generationCount: f.generation_count ?? ((f.people_count ?? 0) > 0 ? 1 : 0),
+          cluster: f.kinship_cluster ?? null,
+          kinshipLinks: (f.kinship_links ?? []).map((link) => ({
+            familyId: link.family_id,
+            strength: link.strength,
+          })),
           incomplete: f.is_incomplete || (f.people_count ?? 0) === 0,
           x: override?.x ?? pose.x,
           z: override?.z ?? pose.z,
@@ -78,6 +130,16 @@ export function VillageAtlas({
 
   const selected = families.find((f) => f.id === selectedId) ?? null;
   const selectedIsland = islands.find((i) => i.id === selectedId) ?? null;
+  const atlasView = useMemo(() => {
+    if (islands.length === 0) return { x: 0, z: 0, distance: 12 };
+    const x = islands.reduce((sum, island) => sum + island.x, 0) / islands.length;
+    const z = islands.reduce((sum, island) => sum + island.z, 0) / islands.length;
+    const radius = Math.max(
+      0,
+      ...islands.map((island) => Math.hypot(island.x - x, island.z - z)),
+    );
+    return { x, z, distance: Math.min(30, Math.max(7.5, radius * 1.65 + 7)) };
+  }, [islands]);
 
   async function persistPosition(id: string, x: number, z: number) {
     setPositions((prev) => ({ ...prev, [id]: { x, z } }));
@@ -127,7 +189,16 @@ export function VillageAtlas({
         <Canvas
           shadows
           dpr={dpr}
-          camera={{ position: [14, 16, 14], fov: 40, near: 0.1, far: 120 }}
+          camera={{
+            position: [
+              atlasView.x + atlasView.distance * 0.72,
+              atlasView.distance * 0.82,
+              atlasView.z + atlasView.distance * 0.72,
+            ],
+            fov: 40,
+            near: 0.1,
+            far: 120,
+          }}
           gl={{
             antialias: true,
             alpha: false,
@@ -160,11 +231,13 @@ export function VillageAtlas({
               blur={2.2}
               far={14}
             />
+            <KinshipPaths islands={islands} />
             {islands.map((island) => (
               <ClanIsland
                 key={island.id}
                 data={island}
                 selected={island.id === selectedId}
+                showLabel={islands.length <= 10}
                 onSelect={setSelectedId}
                 onDragEnd={(id, x, z) => void persistPosition(id, x, z)}
                 draggable={Boolean(user)}
@@ -179,9 +252,9 @@ export function VillageAtlas({
             enableDamping
             dampingFactor={0.06}
             minDistance={4}
-            maxDistance={48}
+            maxDistance={Math.max(28, atlasView.distance * 2.2)}
             maxPolarAngle={Math.PI / 2.12}
-            target={[0, 0.2, 0]}
+            target={[atlasView.x, 0.35, atlasView.z]}
             touches={{
               ONE: THREE.TOUCH.PAN,
               TWO: THREE.TOUCH.DOLLY_ROTATE,
@@ -236,11 +309,30 @@ export function VillageAtlas({
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               <Badge>{selected.people_count ?? 0} kişi</Badge>
+              <Badge>
+                {(selected.generation_count ?? 0) === 0
+                  ? "Yeni ocak"
+                  : `${selected.generation_count} nesil`}
+              </Badge>
               {selectedIsland.incomplete && <Badge tone="accent">Eksik</Badge>}
               {selected.disputed && <Badge tone="warn">Tartışmalı</Badge>}
             </div>
             {selected.notes && (
               <p className="mt-2 line-clamp-3 text-[13px] text-text-secondary">{selected.notes}</p>
+            )}
+            <p className="mt-2 text-[12px] leading-relaxed text-text-tertiary">
+              {selectedIsland.generationCount === 0
+                ? "Temel atıldı. İlk kişi eklendiğinde ocak bir eve dönüşür."
+                : selectedIsland.generationCount === 1
+                  ? "İlk nesil kayıtlı. Yeni kuşaklarla bu ocak büyüyecek."
+                  : selectedIsland.generationCount === 2
+                    ? "İki nesil birbirine bağlandı; aile yerleşkesi gelişiyor."
+                    : "Üç veya daha fazla nesil: köklü aile yerleşkesi."}
+            </p>
+            {(selected.kinship_links?.length ?? 0) > 0 && (
+              <p className="mt-2 rounded-[10px] bg-[#EAF4F1] px-2.5 py-2 text-[11px] font-medium text-[#286F61]">
+                {selected.kinship_links!.length} aileyle kayıtlı akrabalık yolu
+              </p>
             )}
             <div className="mt-4 flex gap-2">
               <Link href={`/family/${selected.id}`} className="flex-1">

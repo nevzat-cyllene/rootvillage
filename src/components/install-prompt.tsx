@@ -54,20 +54,21 @@ export function InstallPrompt() {
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 p-4 animate-fade-up">
-      <div className="mx-auto flex max-w-lg items-start gap-3 rounded-[18px] border border-border-soft bg-bg-surface/95 p-4 shadow-[0_12px_40px_rgba(0,0,0,0.12)] backdrop-blur-xl">
+    <div className="install-prompt fixed inset-x-3 bottom-3 z-50 animate-fade-up sm:left-auto sm:right-4 sm:w-[390px]">
+      <div className="flex items-center gap-3 rounded-[16px] border border-white/80 bg-bg-surface/92 p-3 shadow-[0_14px_44px_rgba(0,0,0,0.14)] backdrop-blur-xl">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-text text-[15px] text-white" aria-hidden>↧</span>
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-semibold tracking-[-0.02em]">Dîwan’ı yükle</p>
-          <p className="mt-1 text-[13px] leading-snug text-text-secondary">
+          <p className="text-[13px] font-semibold tracking-[-0.02em]">Dîwan’ı yükle</p>
+          <p className="mt-0.5 line-clamp-1 text-[11px] leading-snug text-text-secondary">
             {isIos && !deferred
               ? "Safari’de Paylaş → Ana Ekrana Ekle ile telefonuna kur."
               : "Ana ekranına ekle; köy hafızasına anında ulaş."}
           </p>
         </div>
-        <div className="flex shrink-0 flex-col gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           {deferred && (
             <Button
-              className="!py-1.5 !px-3 text-[13px]"
+              className="!px-3 !py-1.5 text-[12px]"
               onClick={async () => {
                 await deferred.prompt();
                 setVisible(false);
@@ -79,13 +80,13 @@ export function InstallPrompt() {
           )}
           <Button
             variant="ghost"
-            className="!py-1.5 !px-3 text-[13px]"
+            className="!h-8 !w-8 !p-0 text-[17px]"
             onClick={() => {
               setVisible(false);
               localStorage.setItem("rv-install-dismissed", "1");
             }}
           >
-            Sonra
+            ×
           </Button>
         </div>
       </div>

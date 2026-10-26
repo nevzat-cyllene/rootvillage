@@ -72,6 +72,13 @@ export type Family = {
   updated_at: string;
   deleted_at: string | null;
   people_count?: number;
+  generation_count?: number;
+  kinship_cluster?: number | null;
+  kinship_links?: Array<{ family_id: string; strength: number }>;
+  /** Families founded by / containing direct children of people in this family. */
+  offspring_family_ids?: string[];
+  /** Direct children of people in this family (1st degree only). */
+  child_people?: Array<{ id: string; full_name: string; family_id: string }>;
 };
 
 export type Person = {
