@@ -87,10 +87,13 @@ export function ClanIsland({
   }, [spawnActive, spawnFrom, data.x, data.z, data.peopleCount, data.id]);
 
   useEffect(() => {
-    if (!settlement.current) return;
+    if (!group.current) return;
     const mats: THREE.MeshStandardMaterial[] = [];
-    settlement.current.traverse((obj) => {
-      if (obj instanceof THREE.Mesh && obj.material instanceof THREE.MeshStandardMaterial) {
+    group.current.traverse((obj) => {
+      if (
+        obj instanceof THREE.Mesh &&
+        obj.material instanceof THREE.MeshStandardMaterial
+      ) {
         mats.push(obj.material);
       }
     });
@@ -161,6 +164,8 @@ export function ClanIsland({
 
     const opacityTarget = dimmed ? 0.35 : 1;
     for (const mat of materials.current) {
+      // Three.js materials are intentionally updated in the render loop for the dim transition.
+      // eslint-disable-next-line react-hooks/immutability
       mat.transparent = dimmed || mat.opacity < 0.99;
       mat.opacity += (opacityTarget - mat.opacity) * 0.12;
     }

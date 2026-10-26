@@ -3,6 +3,7 @@
 import { useAuth } from "@/components/auth-provider";
 import { Badge, Button } from "@/components/ui";
 import { AtlasEnvironment } from "@/components/village-atlas/AtlasEnvironment";
+import { ChildCottageBloom } from "@/components/village-atlas/ChildCottageBloom";
 import { ClanIsland, type IslandData } from "@/components/village-atlas/ClanIsland";
 import { resolveIslandPose } from "@/lib/atlas-layout";
 import { createClient } from "@/lib/supabase/client";
@@ -25,17 +26,30 @@ function useHdDpr() {
 
 const CLUSTER_COLORS = ["#2F8C78", "#4D7FC4", "#A15E93", "#C67C3D", "#6D70B8", "#598763"];
 
-function KinshipPaths({ islands }: { islands: IslandData[] }) {
+function KinshipPaths({
+  islands,
+  highlightIds,
+}: {
+  islands: IslandData[];
+  highlightIds: Set<string>;
+}) {
   const byId = new Map(islands.map((island) => [island.id, island]));
+
   const paths = islands.flatMap((island) =>
     island.kinshipLinks.flatMap((link) => {
       const target = byId.get(link.familyId);
       if (!target || island.id.localeCompare(target.id) >= 0) return [];
       const distance = Math.hypot(target.x - island.x, target.z - island.z);
       const lift = Math.min(1.2, 0.35 + distance * 0.035);
-      const color = island.cluster != null
-        ? CLUSTER_COLORS[island.cluster % CLUSTER_COLORS.length]!
-        : "#7E93A8";
+      const highlighted =
+        highlightIds.size > 0 &&
+        highlightIds.has(island.id) &&
+        highlightIds.has(target.id);
+      const color = highlighted
+        ? "#2F8C78"
+        : island.cluster != null
+          ? CLUSTER_COLORS[island.cluster % CLUSTER_COLORS.length]!
+          : "#7E93A8";
       return [{
         key: `${island.id}:${target.id}`,
         points: [
@@ -45,6 +59,7 @@ function KinshipPaths({ islands }: { islands: IslandData[] }) {
         ] as Array<[number, number, number]>,
         color,
         strength: link.strength,
+        highlighted,
       }];
     }),
   );
@@ -56,10 +71,22 @@ function KinshipPaths({ islands }: { islands: IslandData[] }) {
           key={path.key}
           points={path.points}
           color={path.color}
-          lineWidth={Math.min(4.5, 1.2 + path.strength * 0.75)}
+          lineWidth={
+            path.highlighted
+              ? Math.min(5.2, 2.1 + path.strength)
+              : Math.min(4.5, 1.2 + path.strength * 0.75)
+          }
           transparent
-          opacity={path.strength > 1 ? 0.72 : 0.42}
-          dashed={path.strength === 1}
+          opacity={
+            path.highlighted
+              ? 0.88
+              : highlightIds.size > 0
+                ? 0.18
+                : path.strength > 1
+                  ? 0.72
+                  : 0.42
+          }
+          dashed={!path.highlighted && path.strength === 1}
           dashScale={2.2}
           dashSize={0.35}
           gapSize={0.22}
@@ -91,6 +118,7 @@ export function VillageAtlas({
   const [orbitEnabled, setOrbitEnabled] = useState(true);
   const [dpr, setDpr] = useHdDpr();
   const [shadowSize, setShadowSize] = useState(2048);
+  const [bloomKey, setBloomKey] = useState(0);
 
   useEffect(() => {
     if (!fullscreen) return;
@@ -119,6 +147,12 @@ export function VillageAtlas({
             familyId: link.family_id,
             strength: link.strength,
           })),
+          offspringFamilyIds: f.offspring_family_ids ?? [],
+          childPeople: (f.child_people ?? []).map((child) => ({
+            id: child.id,
+            fullName: child.full_name,
+            familyId: child.family_id,
+          })),
           incomplete: f.is_incomplete || (f.people_count ?? 0) === 0,
           x: override?.x ?? pose.x,
           z: override?.z ?? pose.z,
@@ -130,6 +164,33 @@ export function VillageAtlas({
 
   const selected = families.find((f) => f.id === selectedId) ?? null;
   const selectedIsland = islands.find((i) => i.id === selectedId) ?? null;
+
+  const bloom = useMemo(() => {
+    if (!selectedIsland) {
+      return {
+        origin: null as { x: number; z: number } | null,
+        offspringIds: [] as string[],
+        sameFamilyChildren: [] as Array<{ id: string; fullName: string }>,
+        highlightIds: new Set<string>(),
+      };
+    }
+    const offspringIds = selectedIsland.offspringFamilyIds;
+    const sameFamilyChildren = selectedIsland.childPeople
+      .filter((child) => child.familyId === selectedIsland.id)
+      .map((child) => ({ id: child.id, fullName: child.fullName }));
+    const highlightIds = new Set<string>([selectedIsland.id, ...offspringIds]);
+    return {
+      origin: { x: selectedIsland.x, z: selectedIsland.z },
+      offspringIds,
+      sameFamilyChildren,
+      highlightIds,
+    };
+  }, [selectedIsland]);
+
+  useEffect(() => {
+    if (selectedId) setBloomKey((k) => k + 1);
+  }, [selectedId]);
+
   const atlasView = useMemo(() => {
     if (islands.length === 0) return { x: 0, z: 0, distance: 12 };
     const x = islands.reduce((sum, island) => sum + island.x, 0) / islands.length;
@@ -162,6 +223,10 @@ export function VillageAtlas({
   const canvasWrapClass = fullscreen
     ? "atlas-touch-lock absolute inset-0 h-full w-full"
     : "atlas-touch-lock h-[min(68vh,580px)] w-full";
+
+  const childCount =
+    (selected?.offspring_family_ids?.length ?? 0) +
+    (selectedIsland?.childPeople.filter((c) => c.familyId === selectedIsland.id).length ?? 0);
 
   if (families.length === 0) {
     return (
@@ -211,7 +276,6 @@ export function VillageAtlas({
           onCreated={({ gl, scene }) => {
             gl.setClearColor(new THREE.Color("#E8ECF1"));
             gl.shadowMap.type = THREE.PCFSoftShadowMap;
-            // Far fog so zoom stays sharp up close
             scene.fog = new THREE.Fog("#E8ECF1", 42, 95);
           }}
         >
@@ -231,19 +295,40 @@ export function VillageAtlas({
               blur={2.2}
               far={14}
             />
-            <KinshipPaths islands={islands} />
-            {islands.map((island) => (
-              <ClanIsland
-                key={island.id}
-                data={island}
-                selected={island.id === selectedId}
-                showLabel={islands.length <= 10}
-                onSelect={setSelectedId}
-                onDragEnd={(id, x, z) => void persistPosition(id, x, z)}
-                draggable={Boolean(user)}
-                onDragState={(d) => setOrbitEnabled(!d)}
+            <KinshipPaths islands={islands} highlightIds={bloom.highlightIds} />
+            {islands.map((island) => {
+              const isOffspring = bloom.offspringIds.includes(island.id);
+              const isSelected = island.id === selectedId;
+              const dimmed =
+                Boolean(selectedId) &&
+                !isSelected &&
+                !isOffspring;
+              const spawnIndex = bloom.offspringIds.indexOf(island.id);
+              return (
+                <ClanIsland
+                  key={island.id}
+                  data={island}
+                  selected={isSelected}
+                  showLabel={islands.length <= 10 || isSelected || isOffspring}
+                  onSelect={setSelectedId}
+                  onDragEnd={(id, x, z) => void persistPosition(id, x, z)}
+                  draggable={Boolean(user) && !selectedId}
+                  onDragState={(d) => setOrbitEnabled(!d)}
+                  spawnFrom={isOffspring ? bloom.origin : null}
+                  spawnDelay={isOffspring ? spawnIndex * 70 : 0}
+                  spawnActive={isOffspring && bloomKey > 0}
+                  dimmed={dimmed}
+                />
+              );
+            })}
+            {bloom.origin && (
+              <ChildCottageBloom
+                key={`bloom-${selectedId}-${bloomKey}`}
+                origin={bloom.origin}
+                people={bloom.sameFamilyChildren}
+                active={Boolean(selectedId)}
               />
-            ))}
+            )}
           </Suspense>
 
           <OrbitControls
@@ -254,7 +339,11 @@ export function VillageAtlas({
             minDistance={4}
             maxDistance={Math.max(28, atlasView.distance * 2.2)}
             maxPolarAngle={Math.PI / 2.12}
-            target={[atlasView.x, 0.35, atlasView.z]}
+            target={
+              selectedIsland
+                ? [selectedIsland.x, 0.35, selectedIsland.z]
+                : [atlasView.x, 0.35, atlasView.z]
+            }
             touches={{
               ONE: THREE.TOUCH.PAN,
               TWO: THREE.TOUCH.DOLLY_ROTATE,
@@ -263,7 +352,6 @@ export function VillageAtlas({
         </Canvas>
       </div>
 
-      {/* Floating chrome */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:p-4">
         <div className="pointer-events-auto flex flex-wrap items-start justify-between gap-2">
           <div className="space-y-2">
@@ -329,6 +417,21 @@ export function VillageAtlas({
                     ? "İki nesil birbirine bağlandı; aile yerleşkesi gelişiyor."
                     : "Üç veya daha fazla nesil: köklü aile yerleşkesi."}
             </p>
+            {childCount > 0 ? (
+              <p className="mt-2 rounded-[10px] bg-[#EAF4F1] px-2.5 py-2 text-[11px] font-medium text-[#286F61]">
+                {bloom.sameFamilyChildren.length > 0 && (
+                  <>{bloom.sameFamilyChildren.length} çocuk ocağı açıldı</>
+                )}
+                {bloom.sameFamilyChildren.length > 0 && bloom.offspringIds.length > 0 && " · "}
+                {bloom.offspringIds.length > 0 && (
+                  <>{bloom.offspringIds.length} ayrı aile evi bu ocaktan çıktı</>
+                )}
+              </p>
+            ) : (
+              <p className="mt-2 rounded-[10px] bg-[#F3F4F6] px-2.5 py-2 text-[11px] font-medium text-text-tertiary">
+                Henüz ocağa çıkmış çocuk kaydı yok
+              </p>
+            )}
             {(selected.kinship_links?.length ?? 0) > 0 && (
               <p className="mt-2 rounded-[10px] bg-[#EAF4F1] px-2.5 py-2 text-[11px] font-medium text-[#286F61]">
                 {selected.kinship_links!.length} aileyle kayıtlı akrabalık yolu
