@@ -112,7 +112,7 @@ export function PersonRelationStudio({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pulse, setPulse] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(true);
 
   useEffect(() => {
     if (!focusId || !people.some((p) => p.id === focusId)) {
@@ -126,6 +126,7 @@ export function PersonRelationStudio({
     if (!fullscreen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    document.documentElement.classList.add("kinship-immersive");
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !addRole && !editOpen && !connectionsOpen) {
         setFullscreen(false);
@@ -134,6 +135,7 @@ export function PersonRelationStudio({
     window.addEventListener("keydown", closeOnEscape);
     return () => {
       document.body.style.overflow = previousOverflow;
+      document.documentElement.classList.remove("kinship-immersive");
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [fullscreen, addRole, editOpen, connectionsOpen]);
@@ -525,24 +527,31 @@ export function PersonRelationStudio({
       className={cn(
         "kinship-studio animate-fade-up",
         fullscreen
-          ? "fixed inset-0 z-[70] overflow-y-auto bg-[#EEF4F8] p-3 sm:p-5"
-          : "relative mb-10",
+          ? "fixed inset-0 z-[70] flex h-dvh max-h-dvh w-screen max-w-[100vw] flex-col overflow-hidden bg-[#EEF4F8] p-3 sm:p-5"
+          : "relative mb-10 w-full max-w-full",
       )}
     >
-      <div className={cn("mx-auto", fullscreen && "max-w-[1600px]")}>
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
+      <div
+        className={cn(
+          "mx-auto flex w-full min-w-0 max-w-full flex-col",
+          fullscreen && "h-full max-w-[1600px]",
+        )}
+      >
+        <div className="mb-3 flex shrink-0 flex-col gap-3 sm:mb-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
             <div className="mb-1 flex items-center gap-2">
               <span className="kinship-live-dot" aria-hidden />
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#286F61]">
                 Canlı soy ağı
               </p>
             </div>
-            <h2 className="text-[24px] font-semibold tracking-[-0.04em] sm:text-[28px]">İlişki haritası</h2>
-            <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
-              Bir kişiyi merkeze al; yalnızca ebeveyn ve eş bağlarını kur. Kardeş, teyze, kuzen ve yeğen
-              gibi akrabalıklar otomatik hesaplanır.
-            </p>
+            <h2 className="text-[22px] font-semibold tracking-[-0.04em] sm:text-[28px]">İlişki haritası</h2>
+            {!fullscreen && (
+              <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+                Bir kişiyi merkeze al; yalnızca ebeveyn ve eş bağlarını kur. Kardeş, teyze, kuzen ve yeğen
+                gibi akrabalıklar otomatik hesaplanır.
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <label className="kinship-focus-picker">
@@ -564,20 +573,25 @@ export function PersonRelationStudio({
               onClick={() => setFullscreen((value) => !value)}
             >
               <FullscreenIcon />
-              {fullscreen ? "Küçült" : "Tam ekran"}
+              {fullscreen ? "Sayfaya dön" : "Tam ekran"}
             </Button>
           </div>
         </div>
 
         <div
           className={cn(
-            "kinship-canvas relative overflow-x-auto overflow-y-hidden rounded-[24px] border border-white/80 p-4 sm:p-7",
-            fullscreen ? "min-h-[calc(100dvh-150px)]" : "min-h-[590px]",
+            "kinship-canvas relative min-w-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[24px] border border-white/80 p-3 sm:p-6",
+            fullscreen ? "min-h-0 flex-1" : "min-h-[min(70dvh,640px)]",
           )}
         >
           <div className="kinship-orb kinship-orb-one" aria-hidden />
           <div className="kinship-orb kinship-orb-two" aria-hidden />
-          <div className="relative z-[1] flex min-h-[540px] flex-col justify-center">
+          <div
+            className={cn(
+              "relative z-[1] flex w-full min-w-0 max-w-full flex-col justify-center",
+              fullscreen ? "min-h-full py-2" : "min-h-[520px]",
+            )}
+          >
         {/* Parents of focus only */}
         <TreeBand label="Ebeveynler">
           {(links?.parents ?? []).map((p) => (
@@ -592,10 +606,10 @@ export function PersonRelationStudio({
           Kişi ve eş
         </div>
 
-        <div className="mx-auto flex w-full flex-col items-center justify-center gap-3 px-2 sm:w-max sm:flex-row sm:items-stretch">
+        <div className="mx-auto flex w-full min-w-0 max-w-full flex-col items-center justify-center gap-3 px-1 sm:flex-row sm:items-stretch sm:px-2">
           <div
             className={cn(
-              "relative z-10 flex flex-col items-center gap-3 sm:flex-row sm:items-stretch",
+              "relative z-10 flex w-full min-w-0 max-w-full flex-wrap items-center justify-center gap-3 sm:w-auto sm:flex-nowrap sm:items-stretch",
               spouseLeft && "sm:flex-row-reverse",
             )}
           >
@@ -623,7 +637,7 @@ export function PersonRelationStudio({
 
         </div>
 
-        <div className="mx-auto mt-5 grid max-w-3xl gap-2 sm:grid-cols-2">
+        <div className="mx-auto mt-5 grid w-full min-w-0 max-w-3xl gap-2 px-1 sm:grid-cols-2 sm:px-0">
           <SiblingRail
             label={`${focus?.full_name ?? "Kişi"} · kardeşler`}
             siblings={focusSiblings}
@@ -728,11 +742,13 @@ export function PersonRelationStudio({
 
 function TreeBand({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex w-full min-w-0 max-w-full flex-col items-center gap-2 px-1">
       <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-text-secondary">
         {label}
       </span>
-      <div className="flex flex-wrap items-center justify-center gap-2">{children}</div>
+      <div className="flex w-full min-w-0 max-w-full flex-wrap items-center justify-center gap-2">
+        {children}
+      </div>
     </div>
   );
 }
@@ -849,7 +865,7 @@ function HeroPersonCard({
     return (
       <div
         className={cn(
-          "relative w-[210px] shrink-0 rounded-[22px] border px-4 py-4 text-center text-white transition-all duration-300",
+          "relative w-[min(210px,46vw)] max-w-[210px] shrink-0 rounded-[22px] border px-4 py-4 text-center text-white transition-all duration-300",
           focusTheme,
           pulse && "scale-[1.03]",
         )}
@@ -864,7 +880,7 @@ function HeroPersonCard({
       type="button"
       onClick={onSelect}
       className={cn(
-        "pressable relative w-[210px] shrink-0 rounded-[22px] border px-4 py-4 text-center shadow-[0_14px_38px_rgba(30,50,70,0.12)] ring-2 transition-all hover:-translate-y-1 hover:shadow-[0_20px_46px_rgba(30,50,70,0.18)]",
+        "pressable relative w-[min(210px,46vw)] max-w-[210px] shrink-0 rounded-[22px] border px-4 py-4 text-center shadow-[0_14px_38px_rgba(30,50,70,0.12)] ring-2 transition-all hover:-translate-y-1 hover:shadow-[0_20px_46px_rgba(30,50,70,0.18)]",
         genderRing,
       )}
     >
@@ -1146,7 +1162,7 @@ function SiblingRail({
   return (
     <div className="rounded-[16px] border border-white/80 bg-white/62 p-2.5 shadow-[0_8px_24px_rgba(35,62,82,0.06)] backdrop-blur-lg">
       <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-text-tertiary">{label}</p>
-      <div className="mt-2 flex min-h-10 items-center gap-1.5 overflow-x-auto pb-1">
+      <div className="mt-2 flex min-h-10 max-w-full flex-wrap items-center gap-1.5">
         {siblings.length === 0 && (
           <span className="px-1 text-[11px] text-text-secondary">Henüz kayıt yok</span>
         )}

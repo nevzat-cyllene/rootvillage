@@ -274,6 +274,7 @@ select {
 /* Kinship studio */
 .kinship-canvas {
   isolation: isolate;
+  overflow-x: hidden;
   background:
     linear-gradient(rgba(255, 255, 255, 0.58), rgba(244, 249, 252, 0.76)),
     radial-gradient(circle at 1px 1px, rgba(60, 91, 120, 0.16) 1px, transparent 0);
@@ -281,6 +282,16 @@ select {
   box-shadow:
     0 26px 70px rgba(35, 65, 91, 0.13),
     inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+html.kinship-immersive,
+html.kinship-immersive body {
+  overflow: hidden;
+  height: 100%;
+}
+
+html.kinship-immersive header {
+  display: none;
 }
 
 .kinship-canvas::after {

@@ -16,15 +16,13 @@ type FamilyDraft = {
 
 export function CreateFamilyForm({
   villageId,
-  stayOnVillage = false,
   onCreated,
 }: {
   villageId: string;
-  stayOnVillage?: boolean;
   onCreated?: (familyId: string) => void;
 }) {
   const draftKey = `create-family:${villageId}`;
-  const { user, requireAuth } = useAuth();
+  const { user, loading: authLoading, requireAuth } = useAuth();
   const router = useRouter();
   const [name, setName] = useState("");
   const [aka, setAka] = useState("");
@@ -44,17 +42,19 @@ export function CreateFamilyForm({
   }, [draftKey]);
 
   useEffect(() => {
-    if (!user || resumed.current) return;
+    if (authLoading || !user || resumed.current) return;
     const draft = loadAuthDraft<FamilyDraft>(draftKey);
     if (!draft?.resumeSubmit) return;
     resumed.current = true;
-    clearAuthDraft(draftKey);
     void performSubmit(draft.data);
-  }, [user, draftKey]);
+  }, [user, authLoading, draftKey]);
 
   async function performSubmit(data: FamilyDraft) {
     const cleaned = normalizeFamilyName(data.name);
-    if (!cleaned) return;
+    if (!cleaned) {
+      setError("Aile adı gerekli.");
+      return;
+    }
 
     setBusy(true);
     setError(null);
@@ -64,6 +64,7 @@ export function CreateFamilyForm({
     } = await supabase.auth.getUser();
     if (!u) {
       setBusy(false);
+      setError("Oturum bulunamadı. Tekrar giriş yap.");
       return;
     }
 
@@ -80,8 +81,8 @@ export function CreateFamilyForm({
       .select("id")
       .single();
 
-    setBusy(false);
     if (err || !row) {
+      setBusy(false);
       setError(err?.message ?? "Aile eklenemedi");
       return;
     }
@@ -92,16 +93,24 @@ export function CreateFamilyForm({
     setNotes("");
     setRestoredNotice(false);
     onCreated?.(row.id);
-    if (!stayOnVillage) router.push(`/family/${row.id}`);
+    // Always land on the family page so the founder can be added next.
+    router.push(`/family/${row.id}`);
     router.refresh();
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (authLoading || busy) return;
     const data: FamilyDraft = { name, aka, notes };
-    saveAuthDraft(draftKey, data, true);
-    const ok = await requireAuth();
-    if (!ok) return;
+    if (!name.trim()) {
+      setError("Aile adı gerekli.");
+      return;
+    }
+    if (!user) {
+      saveAuthDraft(draftKey, data, true);
+      await requireAuth();
+      return;
+    }
     clearAuthDraft(draftKey);
     await performSubmit(data);
   }
@@ -143,8 +152,8 @@ export function CreateFamilyForm({
         placeholder="Kısa not"
       />
       {error && <p className="text-[13px] text-danger">{error}</p>}
-      <Button type="submit" disabled={busy || !name.trim()}>
-        {busy ? "Ocak kuruluyor…" : "Aile ocağını kur"}
+      <Button type="submit" disabled={busy || authLoading || !name.trim()}>
+        {busy ? "Ocak kuruluyor…" : authLoading ? "Oturum kontrol…" : "Aile ocağını kur"}
       </Button>
     </form>
   );

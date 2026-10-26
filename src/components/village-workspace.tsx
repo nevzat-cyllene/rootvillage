@@ -3,10 +3,12 @@
 import { CreateFamilyForm } from "@/components/create-family-form";
 import { VillageAtlasLazy } from "@/components/village-atlas/VillageAtlasLazy";
 import { Badge, Button, EmptyState, Surface } from "@/components/ui";
+import { peekAuthDraftResume } from "@/lib/auth-draft";
 import type { Family } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 type Tab = "atlas" | "list";
 
@@ -21,8 +23,25 @@ export function VillageWorkspace({
   villageTurkishName?: string | null;
   families: Family[];
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>("atlas");
   const [createOpen, setCreateOpen] = useState(false);
+
+  // Re-open create sheet after auth redirect, or when ?yeni=1
+  useEffect(() => {
+    const wantsCreate = searchParams.get("yeni") === "1";
+    const pendingDraft = peekAuthDraftResume(`create-family:${villageId}`);
+    if (wantsCreate || pendingDraft) {
+      setCreateOpen(true);
+      if (wantsCreate) {
+        const next = new URLSearchParams(searchParams.toString());
+        next.delete("yeni");
+        const q = next.toString();
+        router.replace(q ? `?${q}` : window.location.pathname, { scroll: false });
+      }
+    }
+  }, [searchParams, villageId, router]);
 
   const tabs = (
     <div className="flex flex-wrap items-center gap-2">
@@ -54,7 +73,7 @@ export function VillageWorkspace({
       </div>
       <Button
         type="button"
-        className="!bg-[#236B5B] !px-3.5 !py-2 text-[12px] shadow-[0_8px_24px_rgba(35,107,91,0.22)] hover:!bg-[#195849]"
+        className="relative z-30 !bg-[#236B5B] !px-3.5 !py-2 text-[12px] shadow-[0_8px_24px_rgba(35,107,91,0.22)] hover:!bg-[#195849]"
         onClick={() => setCreateOpen(true)}
       >
         <span aria-hidden>＋</span> Yeni aile
@@ -92,7 +111,6 @@ export function VillageWorkspace({
         </div>
         <CreateFamilyForm
           villageId={villageId}
-          stayOnVillage
           onCreated={() => setCreateOpen(false)}
         />
       </div>

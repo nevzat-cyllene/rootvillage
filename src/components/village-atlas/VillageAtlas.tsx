@@ -263,11 +263,11 @@ export function VillageAtlas({
             : "flex h-[min(62vh,520px)] items-center justify-center rounded-[20px] border border-dashed border-border bg-bg-elevated/60 px-6 text-center"
         }
       >
-        <div className="text-center">
+        <div className="relative z-30 text-center">
           {topSlot && <div className="mb-8 flex justify-center">{topSlot}</div>}
           <p className="text-[16px] font-semibold tracking-[-0.02em]">Atlas boş</p>
           <p className="mt-2 text-[13px] text-text-secondary">
-            İlk aile kaydını ekleyince burada bir ada olarak görünür.
+            Yukarıdaki “Yeni aile” ile ilk ocağı kur — sonra kurucu kişiyi ekle.
           </p>
         </div>
       </div>

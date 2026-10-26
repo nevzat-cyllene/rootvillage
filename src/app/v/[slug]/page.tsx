@@ -1,8 +1,9 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { VillageWorkspace } from "@/components/village-workspace";
 import { getFamiliesByVillage, getVillageBySlug } from "@/lib/data";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -30,11 +31,13 @@ export default async function VillagePage({
   const families = await getFamiliesByVillage(village.id);
 
   return (
-    <VillageWorkspace
-      villageId={village.id}
-      villageName={village.name}
-      villageTurkishName={village.name_tr}
-      families={families}
-    />
+    <Suspense fallback={<div className="p-6 text-[13px] text-text-secondary">Köy yükleniyor…</div>}>
+      <VillageWorkspace
+        villageId={village.id}
+        villageName={village.name}
+        villageTurkishName={village.name_tr}
+        families={families}
+      />
+    </Suspense>
   );
 }
