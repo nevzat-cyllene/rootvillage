@@ -136,6 +136,7 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
       generation_count: (family.people_count ?? 0) > 0 ? 1 : 0,
       offspring_family_ids: [],
       child_people: [],
+      children_by_person: {},
     }));
   }
 
@@ -152,10 +153,15 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
   const familyLinkCounts = new Map<string, number>();
   /** parentFamilyId → child family ids (cross-family only) */
   const offspringByFamily = new Map<string, Set<string>>();
-  /** parentFamilyId → direct child people */
+  /** parentFamilyId → direct child people (deduped by child id) */
   const childrenByFamily = new Map<
     string,
     Map<string, { id: string; full_name: string; family_id: string }>
+  >();
+  /** parentPersonId → direct children (deduped) */
+  const childrenByPersonMaps = new Map<
+    string,
+    Map<string, { id: string; full_name: string }>
   >();
 
   for (const relation of relationRows ?? []) {
@@ -178,9 +184,13 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
 
     const childName = nameByPerson.get(childId);
     if (childName) {
-      const bucket = childrenByFamily.get(parentFamily) ?? new Map();
-      bucket.set(childId, { id: childId, full_name: childName, family_id: childFamily });
-      childrenByFamily.set(parentFamily, bucket);
+      const familyBucket = childrenByFamily.get(parentFamily) ?? new Map();
+      familyBucket.set(childId, { id: childId, full_name: childName, family_id: childFamily });
+      childrenByFamily.set(parentFamily, familyBucket);
+
+      const personBucket = childrenByPersonMaps.get(parentId) ?? new Map();
+      personBucket.set(childId, { id: childId, full_name: childName });
+      childrenByPersonMaps.set(parentId, personBucket);
     }
 
     if (childFamily !== parentFamily) {
@@ -194,6 +204,11 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
     const current = parentsByChild.get(childId) ?? [];
     current.push(parentId);
     parentsByChild.set(childId, current);
+  }
+
+  const childrenByPerson: Record<string, Array<{ id: string; full_name: string }>> = {};
+  for (const [parentId, kids] of childrenByPersonMaps) {
+    childrenByPerson[parentId] = [...kids.values()];
   }
 
   const depthMemo = new Map<string, number>();
@@ -255,6 +270,7 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
       kinship_links: kinshipLinks,
       offspring_family_ids: [...(offspringByFamily.get(family.id) ?? [])],
       child_people: [...(childrenByFamily.get(family.id)?.values() ?? [])],
+      children_by_person: childrenByPerson,
     };
   });
 }

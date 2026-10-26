@@ -1,16 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
 import { Button, Input, Textarea } from "@/components/ui";
+import { clearAuthDraft, loadAuthDraft, saveAuthDraft } from "@/lib/auth-draft";
 import { heritageTypeMeta } from "@/lib/heritage";
 import { createClient } from "@/lib/supabase/client";
 import { heritageEntryTypes, type HeritageEntryType } from "@/lib/types";
 import { slugify } from "@/lib/utils";
 
+const DRAFT_KEY = "create-heritage";
+
+type HeritageDraft = {
+  entryType: HeritageEntryType;
+  title: string;
+  titleTr: string;
+  locationText: string;
+  summary: string;
+  content: string;
+  sourceNote: string;
+};
+
 export function CreateHeritageEntryForm() {
-  const { requireAuth } = useAuth();
+  const { user, requireAuth } = useAuth();
   const router = useRouter();
   const [entryType, setEntryType] = useState<HeritageEntryType>("region");
   const [title, setTitle] = useState("");
@@ -21,44 +34,67 @@ export function CreateHeritageEntryForm() {
   const [sourceNote, setSourceNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [restoredNotice, setRestoredNotice] = useState(false);
+  const resumed = useRef(false);
 
-  async function onSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    const ok = await requireAuth();
-    if (!ok || !title.trim()) return;
+  useEffect(() => {
+    const draft = loadAuthDraft<HeritageDraft>(DRAFT_KEY);
+    if (!draft) return;
+    setEntryType(draft.data.entryType ?? "region");
+    setTitle(draft.data.title ?? "");
+    setTitleTr(draft.data.titleTr ?? "");
+    setLocationText(draft.data.locationText ?? "");
+    setSummary(draft.data.summary ?? "");
+    setContent(draft.data.content ?? "");
+    setSourceNote(draft.data.sourceNote ?? "");
+    setRestoredNotice(true);
+  }, []);
+
+  useEffect(() => {
+    if (!user || resumed.current) return;
+    const draft = loadAuthDraft<HeritageDraft>(DRAFT_KEY);
+    if (!draft?.resumeSubmit) return;
+    resumed.current = true;
+    clearAuthDraft(DRAFT_KEY);
+    void performSubmit(draft.data);
+  }, [user]);
+
+  async function performSubmit(data: HeritageDraft) {
+    if (!data.title.trim()) return;
 
     setBusy(true);
     setError(null);
     const supabase = createClient();
     const {
-      data: { user },
+      data: { user: u },
     } = await supabase.auth.getUser();
-    if (!user) {
+    if (!u) {
       setBusy(false);
       return;
     }
 
-    const base = slugify(title) || "kayit";
+    const base = slugify(data.title) || "kayit";
     let slug = base;
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const { data, error: insertError } = await supabase
+      const { data: row, error: insertError } = await supabase
         .from("heritage_entries")
         .insert({
-          entry_type: entryType,
-          title: title.trim(),
-          title_tr: titleTr.trim() || null,
+          entry_type: data.entryType,
+          title: data.title.trim(),
+          title_tr: data.titleTr.trim() || null,
           slug,
-          location_text: locationText.trim() || null,
-          summary: summary.trim() || null,
-          content: content.trim() || null,
-          source_note: sourceNote.trim() || null,
-          created_by: user.id,
+          location_text: data.locationText.trim() || null,
+          summary: data.summary.trim() || null,
+          content: data.content.trim() || null,
+          source_note: data.sourceNote.trim() || null,
+          created_by: u.id,
         })
         .select("slug")
         .single();
 
-      if (!insertError && data) {
-        router.push(`/archive/${data.slug}`);
+      if (!insertError && row) {
+        clearAuthDraft(DRAFT_KEY);
+        router.push(`/archive/${row.slug}`);
         router.refresh();
         return;
       }
@@ -75,8 +111,31 @@ export function CreateHeritageEntryForm() {
     setBusy(false);
   }
 
+  async function onSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    const data: HeritageDraft = {
+      entryType,
+      title,
+      titleTr,
+      locationText,
+      summary,
+      content,
+      sourceNote,
+    };
+    saveAuthDraft(DRAFT_KEY, data, true);
+    const ok = await requireAuth();
+    if (!ok) return;
+    clearAuthDraft(DRAFT_KEY);
+    await performSubmit(data);
+  }
+
   return (
     <form onSubmit={(event) => void onSubmit(event)} className="space-y-3">
+      {restoredNotice && (
+        <p className="rounded-[12px] bg-[#EAF4F1] px-3 py-2 text-[12px] font-medium text-[#286F61]">
+          Girişten önce yazdığın bilgiler geri yüklendi.
+        </p>
+      )}
       <div>
         <label className="mb-1.5 block text-[12px] font-medium text-text-secondary">Kayıt türü</label>
         <select

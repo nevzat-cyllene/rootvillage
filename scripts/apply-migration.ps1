@@ -7,7 +7,8 @@ $migrations = @(
   "003_person_avatar.sql",
   "004_heritage_archive.sql",
   "005_relation_integrity.sql",
-  "006_heritage_comments.sql"
+  "006_heritage_comments.sql",
+  "007_person_generation.sql"
 )
 
 Write-Host ""
@@ -21,7 +22,7 @@ Write-Host "3) Auth > Providers > Google: enable"
 Write-Host "4) Redirect: http://localhost:3000/auth/callback (+ Vercel URL)"
 Write-Host ""
 
-$latest = Join-Path $root "supabase\migrations\006_heritage_comments.sql"
+$latest = Join-Path $root "supabase\migrations\007_person_generation.sql"
 if (Test-Path $latest) {
   Invoke-Item $latest
 } else {

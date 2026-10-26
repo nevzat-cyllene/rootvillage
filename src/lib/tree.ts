@@ -28,12 +28,24 @@ export function linksForPerson(
     .filter((r) => r.person_id === focusId && r.relation_type === "parent")
     .map((r) => r.related_person_id);
 
-  const parents = parentIds.map((id) => byId.get(id)).filter(Boolean) as Person[];
+  const parents = [
+    ...new Map(
+      parentIds
+        .map((id) => byId.get(id))
+        .filter(Boolean)
+        .map((person) => [person!.id, person!]),
+    ).values(),
+  ];
 
-  const children = relations
-    .filter((r) => r.related_person_id === focusId && r.relation_type === "parent")
-    .map((r) => byId.get(r.person_id))
-    .filter(Boolean) as Person[];
+  const children = [
+    ...new Map(
+      relations
+        .filter((r) => r.related_person_id === focusId && r.relation_type === "parent")
+        .map((r) => byId.get(r.person_id))
+        .filter(Boolean)
+        .map((person) => [person!.id, person!]),
+    ).values(),
+  ];
 
   const spouseIds = new Set<string>();
   for (const r of relations) {
@@ -189,4 +201,65 @@ export function extendedLinksForPerson(
     seen.add(key);
     return true;
   });
+}
+
+/** Generation number within a family (1 = founding / no in-family parents). */
+export function resolvePersonGeneration(
+  personId: string,
+  people: Person[],
+  relations: PersonRelation[],
+  memo = new Map<string, number>(),
+  path = new Set<string>(),
+): number {
+  const cached = memo.get(personId);
+  if (cached != null) return cached;
+  if (path.has(personId)) return 1;
+
+  const person = people.find((p) => p.id === personId);
+  if (!person) return 1;
+  if (person.generation != null && person.generation >= 1) {
+    memo.set(personId, person.generation);
+    return person.generation;
+  }
+
+  const nextPath = new Set(path).add(personId);
+  const inFamilyParents = relations
+    .filter(
+      (r) =>
+        r.relation_type === "parent" &&
+        r.person_id === personId &&
+        people.some((p) => p.id === r.related_person_id && p.family_id === person.family_id),
+    )
+    .map((r) => r.related_person_id);
+
+  const generation =
+    inFamilyParents.length === 0
+      ? 1
+      : 1 +
+        Math.max(
+          ...inFamilyParents.map((parentId) =>
+            resolvePersonGeneration(parentId, people, relations, memo, nextPath),
+          ),
+        );
+
+  memo.set(personId, generation);
+  return generation;
+}
+
+/** Short kinship label relative to founding generation (1). */
+export function generationKinLabel(generation: number): string {
+  if (generation <= 1) return "1. nesil · kurucu";
+  if (generation === 2) return "Çocuk · 2. nesil";
+  if (generation === 3) return "Torun · 3. nesil";
+  if (generation === 4) return "Torun çocuğu · 4. nesil";
+  if (generation === 5) return "Torunun torunu · 5. nesil";
+  return `${generation}. nesil`;
+}
+
+export function generationBadgeLabel(generation: number): string {
+  if (generation <= 1) return "1. nesil";
+  if (generation === 2) return "Çocuk";
+  if (generation === 3) return "Torun";
+  if (generation === 4) return "Torun çocuğu";
+  return `${generation}. nesil`;
 }

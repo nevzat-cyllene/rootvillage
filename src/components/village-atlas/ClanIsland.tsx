@@ -13,7 +13,6 @@ export type IslandData = {
   generationCount: number;
   cluster: number | null;
   kinshipLinks: Array<{ familyId: string; strength: number }>;
-  offspringFamilyIds: string[];
   childPeople: Array<{ id: string; fullName: string; familyId: string }>;
   incomplete: boolean;
   x: number;
@@ -21,38 +20,107 @@ export type IslandData = {
   seed: number;
 };
 
-function easeOutCubic(t: number) {
-  return 1 - (1 - t) ** 3;
-}
+/** Shared settlement props: ana ev + küçük ev + ağaç + at + araba */
+export function SettlementProps({
+  roof = "#5B6B7C",
+  compact = false,
+}: {
+  roof?: string;
+  compact?: boolean;
+}) {
+  const s = compact ? 0.72 : 1;
+  return (
+    <group scale={s}>
+      {/* Ana ev */}
+      <mesh position={[-0.32, 0.5, 0.05]} castShadow>
+        <boxGeometry args={[0.7, 0.62, 0.55]} />
+        <meshStandardMaterial color="#FCFDFE" roughness={0.48} metalness={0.04} transparent />
+      </mesh>
+      <mesh position={[-0.32, 0.9, 0.05]} castShadow rotation={[0, Math.PI / 4, 0]}>
+        <coneGeometry args={[0.54, 0.44, 4]} />
+        <meshStandardMaterial color={roof} roughness={0.42} metalness={0.18} transparent />
+      </mesh>
+      <mesh position={[-0.31, 0.48, 0.34]}>
+        <boxGeometry args={[0.16, 0.24, 0.025]} />
+        <meshStandardMaterial color="#F6B85B" emissive="#F6A83D" emissiveIntensity={0.5} transparent />
+      </mesh>
 
-function elasticOut(t: number) {
-  if (t === 0 || t === 1) return t;
-  return 2 ** (-10 * t) * Math.sin((t - 0.075) * (2 * Math.PI) / 0.3) + 1;
+      {/* Küçük ev */}
+      <mesh position={[0.52, 0.42, -0.12]} castShadow>
+        <boxGeometry args={[0.46, 0.46, 0.4]} />
+        <meshStandardMaterial color="#F3F7FA" roughness={0.54} transparent />
+      </mesh>
+      <mesh position={[0.52, 0.72, -0.12]} castShadow rotation={[0, Math.PI / 4, 0]}>
+        <coneGeometry args={[0.36, 0.32, 4]} />
+        <meshStandardMaterial color={roof} roughness={0.5} metalness={0.12} transparent />
+      </mesh>
+
+      {/* Ağaç */}
+      <mesh position={[0.72, 0.58, 0.55]} castShadow>
+        <sphereGeometry args={[0.22, 20, 16]} />
+        <meshStandardMaterial color="#6C9278" roughness={0.8} transparent />
+      </mesh>
+      <mesh position={[0.72, 0.32, 0.55]}>
+        <cylinderGeometry args={[0.045, 0.06, 0.36, 10]} />
+        <meshStandardMaterial color="#72563F" transparent />
+      </mesh>
+
+      {/* At */}
+      <group position={[-0.85, 0.34, 0.62]} rotation={[0, -0.4, 0]}>
+        <mesh castShadow>
+          <boxGeometry args={[0.4, 0.18, 0.16]} />
+          <meshStandardMaterial color="#8B654A" roughness={0.9} transparent />
+        </mesh>
+        <mesh position={[0.24, 0.12, 0]} castShadow>
+          <boxGeometry args={[0.13, 0.18, 0.13]} />
+          <meshStandardMaterial color="#7A563E" roughness={0.9} transparent />
+        </mesh>
+        {[-0.13, 0.13].flatMap((x) =>
+          [-0.05, 0.05].map((z) => (
+            <mesh key={`${x}:${z}`} position={[x, -0.18, z]} castShadow>
+              <cylinderGeometry args={[0.016, 0.02, 0.26, 7]} />
+              <meshStandardMaterial color="#5E4232" roughness={1} transparent />
+            </mesh>
+          )),
+        )}
+      </group>
+
+      {/* Araba */}
+      <group position={[-0.78, 0.28, -0.55]} rotation={[0, 0.4, 0]}>
+        <mesh castShadow>
+          <boxGeometry args={[0.44, 0.16, 0.28]} />
+          <meshStandardMaterial color="#A97747" roughness={0.86} transparent />
+        </mesh>
+        {[-0.18, 0.18].map((x) => (
+          <mesh key={x} position={[x, -0.11, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
+            <cylinderGeometry args={[0.12, 0.12, 0.035, 16]} />
+            <meshStandardMaterial color="#4F3B31" roughness={0.95} transparent />
+          </mesh>
+        ))}
+        <mesh position={[0.4, -0.01, 0]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.016, 0.016, 0.46, 8]} />
+          <meshStandardMaterial color="#6D4D34" roughness={1} transparent />
+        </mesh>
+      </group>
+    </group>
+  );
 }
 
 export function ClanIsland({
   data,
   selected,
-  showLabel = false,
   onSelect,
   onDragEnd,
   draggable,
   onDragState,
-  spawnFrom = null,
-  spawnDelay = 0,
-  spawnActive = false,
   dimmed = false,
 }: {
   data: IslandData;
   selected: boolean;
-  showLabel?: boolean;
   onSelect: (id: string) => void;
   onDragEnd: (id: string, x: number, z: number) => void;
   draggable: boolean;
   onDragState?: (dragging: boolean) => void;
-  spawnFrom?: { x: number; z: number } | null;
-  spawnDelay?: number;
-  spawnActive?: boolean;
   dimmed?: boolean;
 }) {
   const group = useRef<THREE.Group>(null);
@@ -63,37 +131,12 @@ export function ClanIsland({
   const offset = useRef(new THREE.Vector3());
   const plane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
   const hit = useMemo(() => new THREE.Vector3(), []);
-  const spawnStarted = useRef<number | null>(null);
-  const spawnDone = useRef(!spawnActive);
-
-  useEffect(() => {
-    if (!spawnActive || !spawnFrom) {
-      spawnStarted.current = null;
-      spawnDone.current = true;
-      if (group.current) {
-        group.current.position.x = data.x;
-        group.current.position.z = data.z;
-        group.current.scale.setScalar(0.9 + Math.min(data.peopleCount, 12) * 0.045);
-      }
-      return;
-    }
-    spawnStarted.current = null;
-    spawnDone.current = false;
-    if (group.current) {
-      group.current.position.x = spawnFrom.x;
-      group.current.position.z = spawnFrom.z;
-      group.current.scale.setScalar(0.01);
-    }
-  }, [spawnActive, spawnFrom, data.x, data.z, data.peopleCount, data.id]);
 
   useEffect(() => {
     if (!group.current) return;
     const mats: THREE.MeshStandardMaterial[] = [];
     group.current.traverse((obj) => {
-      if (
-        obj instanceof THREE.Mesh &&
-        obj.material instanceof THREE.MeshStandardMaterial
-      ) {
+      if (obj instanceof THREE.Mesh && obj.material instanceof THREE.MeshStandardMaterial) {
         mats.push(obj.material);
       }
     });
@@ -102,20 +145,20 @@ export function ClanIsland({
 
   const colors = useMemo(() => {
     const palettes = [
-      { land: "#D8DCE2", rock: "#A8B0BA", roof: "#5B6B7C" },
-      { land: "#E2E6EC", rock: "#9AA3AE", roof: "#4A5562" },
-      { land: "#D0D5DC", rock: "#8E97A3", roof: "#6E7C8C" },
-      { land: "#E8EBEE", rock: "#ADB5BF", roof: "#3F4A57" },
-      { land: "#D5DAE1", rock: "#7A8490", roof: "#5B6B7C" },
-      { land: "#DEE3E9", rock: "#9099A5", roof: "#4A5562" },
+      { land: "#D8DCE2", roof: "#5B6B7C" },
+      { land: "#E2E6EC", roof: "#4A5562" },
+      { land: "#D0D5DC", roof: "#6E7C8C" },
+      { land: "#E8EBEE", roof: "#3F4A57" },
+      { land: "#D5DAE1", roof: "#5B6B7C" },
+      { land: "#DEE3E9", roof: "#4A5562" },
     ];
     const clusterPalettes = [
-      { land: "#D9EBE5", rock: "#83AA9D", roof: "#2F7969" },
-      { land: "#DBE7F5", rock: "#86A4CB", roof: "#426FA7" },
-      { land: "#F0E0EC", rock: "#B78EAC", roof: "#8D4F80" },
-      { land: "#F2E5D8", rock: "#C59A70", roof: "#A66533" },
-      { land: "#E5E3F3", rock: "#9C9AC3", roof: "#6467A4" },
-      { land: "#E1EBDD", rock: "#95AD8D", roof: "#557D50" },
+      { land: "#D9EBE5", roof: "#2F7969" },
+      { land: "#DBE7F5", roof: "#426FA7" },
+      { land: "#F0E0EC", roof: "#8D4F80" },
+      { land: "#F2E5D8", roof: "#A66533" },
+      { land: "#E5E3F3", roof: "#6467A4" },
+      { land: "#E1EBDD", roof: "#557D50" },
     ];
     if (data.cluster != null) {
       return clusterPalettes[data.cluster % clusterPalettes.length]!;
@@ -124,37 +167,15 @@ export function ClanIsland({
   }, [data.seed, data.cluster]);
 
   const restScale = 0.9 + Math.min(data.peopleCount, 12) * 0.045;
+  const stage = Math.min(data.generationCount, 3);
 
   useFrame(({ clock }) => {
     if (!group.current || dragging.current) return;
     const t = clock.elapsedTime;
-    const now = performance.now();
-
-    if (spawnActive && spawnFrom && !spawnDone.current) {
-      if (spawnStarted.current == null) spawnStarted.current = now;
-      const elapsed = now - spawnStarted.current - spawnDelay;
-      if (elapsed < 0) {
-        group.current.position.x = spawnFrom.x;
-        group.current.position.z = spawnFrom.z;
-        group.current.position.y = 0.15;
-        group.current.scale.setScalar(0.01);
-        return;
-      }
-      const duration = 620;
-      const raw = Math.min(1, elapsed / duration);
-      const move = easeOutCubic(raw);
-      const pop = elasticOut(Math.min(1, raw * 1.05));
-      group.current.position.x = spawnFrom.x + (data.x - spawnFrom.x) * move;
-      group.current.position.z = spawnFrom.z + (data.z - spawnFrom.z) * move;
-      group.current.position.y = Math.sin(move * Math.PI) * 0.55 + Math.sin(t * 0.7 + data.seed) * 0.03;
-      group.current.scale.setScalar(0.01 + (restScale - 0.01) * pop);
-      if (raw >= 1) spawnDone.current = true;
-    } else {
-      group.current.position.x = data.x;
-      group.current.position.z = data.z;
-      group.current.position.y = Math.sin(t * 0.7 + data.seed) * 0.06;
-      group.current.scale.setScalar(restScale);
-    }
+    group.current.position.x = data.x;
+    group.current.position.z = data.z;
+    group.current.position.y = Math.sin(t * 0.7 + data.seed) * 0.06;
+    group.current.scale.setScalar(restScale);
 
     if (settlement.current) {
       const target = selected ? 1.1 : hovered ? 1.06 : 1;
@@ -164,8 +185,6 @@ export function ClanIsland({
 
     const opacityTarget = dimmed ? 0.35 : 1;
     for (const mat of materials.current) {
-      // Three.js materials are intentionally updated in the render loop for the dim transition.
-      // eslint-disable-next-line react-hooks/immutability
       mat.transparent = dimmed || mat.opacity < 0.99;
       mat.opacity += (opacityTarget - mat.opacity) * 0.12;
     }
@@ -174,7 +193,7 @@ export function ClanIsland({
   function pointerDown(e: ThreeEvent<PointerEvent>) {
     e.stopPropagation();
     onSelect(data.id);
-    if (!draggable || !group.current || spawnActive) return;
+    if (!draggable || !group.current) return;
     dragging.current = true;
     onDragState?.(true);
     offset.current.set(
@@ -198,8 +217,6 @@ export function ClanIsland({
     onDragState?.(false);
     onDragEnd(data.id, group.current.position.x, group.current.position.z);
   }
-
-  const stage = Math.min(data.generationCount, 3);
 
   return (
     <group
@@ -251,110 +268,18 @@ export function ClanIsland({
             </mesh>
           </>
         ) : (
-          <>
-            <mesh position={[-0.28, 0.5, 0.08]} castShadow>
-              <boxGeometry args={[0.64, 0.62, 0.52]} />
-              <meshStandardMaterial color="#FCFDFE" roughness={0.48} metalness={0.04} transparent />
-            </mesh>
-            <mesh position={[-0.28, 0.88, 0.08]} castShadow rotation={[0, Math.PI / 4, 0]}>
-              <coneGeometry args={[0.5, 0.42, 4]} />
-              <meshStandardMaterial color={colors.roof} roughness={0.42} metalness={0.18} transparent />
-            </mesh>
-            <mesh position={[-0.27, 0.49, 0.345]}>
-              <boxGeometry args={[0.16, 0.24, 0.025]} />
-              <meshStandardMaterial
-                color="#F6B85B"
-                emissive="#F6A83D"
-                emissiveIntensity={0.5}
-                transparent
-              />
-            </mesh>
-          </>
-        )}
-
-        <>
-          <mesh position={[0.55, 0.45, -0.16]} castShadow>
-            <boxGeometry args={[0.5, 0.5, 0.42]} />
-            <meshStandardMaterial color="#F3F7FA" roughness={0.54} transparent />
-          </mesh>
-          <mesh position={[0.55, 0.76, -0.16]} castShadow rotation={[0, Math.PI / 4, 0]}>
-            <coneGeometry args={[0.4, 0.34, 4]} />
-            <meshStandardMaterial color={colors.roof} roughness={0.5} metalness={0.12} transparent />
-          </mesh>
-          <mesh position={[0.78, 0.6, 0.52]} castShadow>
-            <sphereGeometry args={[0.21, 24, 18]} />
-            <meshStandardMaterial color="#6C9278" roughness={0.8} transparent />
-          </mesh>
-          <mesh position={[0.78, 0.34, 0.52]}>
-            <cylinderGeometry args={[0.05, 0.065, 0.38, 10]} />
-            <meshStandardMaterial color="#72563F" transparent />
-          </mesh>
-        </>
-
-        <group position={[-0.9, 0.36, 0.66]} rotation={[0, -0.45, 0]}>
-          <mesh castShadow>
-            <boxGeometry args={[0.42, 0.2, 0.17]} />
-            <meshStandardMaterial color="#8B654A" roughness={0.9} transparent />
-          </mesh>
-          <mesh position={[0.25, 0.13, 0]} castShadow>
-            <boxGeometry args={[0.14, 0.2, 0.14]} />
-            <meshStandardMaterial color="#7A563E" roughness={0.9} transparent />
-          </mesh>
-          {[-0.14, 0.14].flatMap((x) =>
-            [-0.055, 0.055].map((z) => (
-              <mesh key={`${x}:${z}`} position={[x, -0.2, z]} castShadow>
-                <cylinderGeometry args={[0.018, 0.022, 0.28, 7]} />
-                <meshStandardMaterial color="#5E4232" roughness={1} transparent />
-              </mesh>
-            )),
-          )}
-        </group>
-
-        <group position={[-0.82, 0.31, -0.55]} rotation={[0, 0.35, 0]}>
-          <mesh castShadow>
-            <boxGeometry args={[0.46, 0.18, 0.3]} />
-            <meshStandardMaterial color="#A97747" roughness={0.86} transparent />
-          </mesh>
-          {[-0.2, 0.2].map((x) => (
-            <mesh key={x} position={[x, -0.12, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-              <cylinderGeometry args={[0.13, 0.13, 0.04, 16]} />
-              <meshStandardMaterial color="#4F3B31" roughness={0.95} transparent />
-            </mesh>
-          ))}
-          <mesh position={[0.42, -0.01, 0]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.018, 0.018, 0.5, 8]} />
-            <meshStandardMaterial color="#6D4D34" roughness={1} transparent />
-          </mesh>
-        </group>
-
-        {stage >= 3 && (
-          <>
-            <mesh position={[0.2, 0.34, 0.65]} castShadow>
-              <boxGeometry args={[0.44, 0.38, 0.36]} />
-              <meshStandardMaterial color="#FFFFFF" roughness={0.5} transparent />
-            </mesh>
-            <mesh position={[0.2, 0.58, 0.65]} castShadow rotation={[0, Math.PI / 4, 0]}>
-              <coneGeometry args={[0.34, 0.28, 4]} />
-              <meshStandardMaterial color="#B56B58" roughness={0.48} transparent />
-            </mesh>
-            <mesh position={[0, 0.245, -0.75]} rotation={[-Math.PI / 2, 0, 0]}>
-              <planeGeometry args={[0.55, 1.05]} />
-              <meshStandardMaterial color="#CAD2DC" roughness={1} transparent />
-            </mesh>
-          </>
+          <SettlementProps roof={colors.roof} />
         )}
       </group>
 
-      {(showLabel || selected || hovered || spawnActive) && (
-        <Html distanceFactor={9} position={[0, 1.58, 0]} center>
-          <div className="pointer-events-none whitespace-nowrap rounded-full border border-white/70 bg-white/95 px-3 py-1.5 text-[12px] font-semibold tracking-[-0.02em] text-text shadow-[0_8px_24px_rgba(31,42,55,0.16)] backdrop-blur-xl">
-            {data.name}
-            <span className="ml-1.5 text-[10px] font-medium text-text-tertiary">
-              {stage === 0 ? "temel" : `${data.generationCount} nesil`}
-            </span>
-          </div>
-        </Html>
-      )}
+      <Html distanceFactor={9} position={[0, 1.62, 0]} center>
+        <div className="pointer-events-none whitespace-nowrap rounded-full border border-white/70 bg-white/95 px-3 py-1.5 text-[12px] font-semibold tracking-[-0.02em] text-text shadow-[0_8px_24px_rgba(31,42,55,0.16)] backdrop-blur-xl">
+          {data.name}
+          <span className="ml-1.5 text-[10px] font-medium text-text-tertiary">
+            {stage === 0 ? "temel" : `${data.generationCount} nesil`}
+          </span>
+        </div>
+      </Html>
 
       {selected && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>

@@ -2,11 +2,12 @@
 
 import { useAuth } from "@/components/auth-provider";
 import { Button, EmptyState, Input, Surface, Textarea } from "@/components/ui";
+import { clearAuthDraft, loadAuthDraft, saveAuthDraft } from "@/lib/auth-draft";
 import { createClient } from "@/lib/supabase/client";
 import type { Comment, CommentTarget } from "@/lib/types";
 import { relativeTime } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function CommentsPanel({
   targetType,
@@ -23,18 +24,30 @@ export function CommentsPanel({
   description?: string;
   placeholder?: string;
 }) {
+  const draftKey = `comment:${targetType}:${targetId}`;
   const { user, requireAuth } = useAuth();
   const router = useRouter();
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const resumed = useRef(false);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const ok = await requireAuth();
-    if (!ok) return;
-    if (!body.trim()) return;
+  useEffect(() => {
+    const draft = loadAuthDraft<{ body: string }>(draftKey);
+    if (draft?.data.body) setBody(draft.data.body);
+  }, [draftKey]);
 
+  useEffect(() => {
+    if (!user || resumed.current) return;
+    const draft = loadAuthDraft<{ body: string }>(draftKey);
+    if (!draft?.resumeSubmit || !draft.data.body.trim()) return;
+    resumed.current = true;
+    clearAuthDraft(draftKey);
+    void postComment(draft.data.body);
+  }, [user, draftKey]);
+
+  async function postComment(text: string) {
+    if (!text.trim()) return;
     setBusy(true);
     setError(null);
     const supabase = createClient();
@@ -49,7 +62,7 @@ export function CommentsPanel({
     const { error: err } = await supabase.from("comments").insert({
       target_type: targetType,
       target_id: targetId,
-      body: body.trim(),
+      body: text.trim(),
       author_id: u.id,
     });
 
@@ -58,8 +71,18 @@ export function CommentsPanel({
       setError(err.message);
       return;
     }
+    clearAuthDraft(draftKey);
     setBody("");
     router.refresh();
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    saveAuthDraft(draftKey, { body }, true);
+    const ok = await requireAuth();
+    if (!ok) return;
+    clearAuthDraft(draftKey);
+    await postComment(body);
   }
 
   return (

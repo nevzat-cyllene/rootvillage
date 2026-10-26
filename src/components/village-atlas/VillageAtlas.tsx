@@ -28,10 +28,10 @@ const CLUSTER_COLORS = ["#2F8C78", "#4D7FC4", "#A15E93", "#C67C3D", "#6D70B8", "
 
 function KinshipPaths({
   islands,
-  highlightIds,
+  focusFamilyId,
 }: {
   islands: IslandData[];
-  highlightIds: Set<string>;
+  focusFamilyId: string | null;
 }) {
   const byId = new Map(islands.map((island) => [island.id, island]));
 
@@ -41,11 +41,10 @@ function KinshipPaths({
       if (!target || island.id.localeCompare(target.id) >= 0) return [];
       const distance = Math.hypot(target.x - island.x, target.z - island.z);
       const lift = Math.min(1.2, 0.35 + distance * 0.035);
-      const highlighted =
-        highlightIds.size > 0 &&
-        highlightIds.has(island.id) &&
-        highlightIds.has(target.id);
-      const color = highlighted
+      const relatedToFocus =
+        focusFamilyId != null &&
+        (island.id === focusFamilyId || target.id === focusFamilyId);
+      const color = relatedToFocus
         ? "#2F8C78"
         : island.cluster != null
           ? CLUSTER_COLORS[island.cluster % CLUSTER_COLORS.length]!
@@ -59,7 +58,7 @@ function KinshipPaths({
         ] as Array<[number, number, number]>,
         color,
         strength: link.strength,
-        highlighted,
+        relatedToFocus,
       }];
     }),
   );
@@ -72,21 +71,21 @@ function KinshipPaths({
           points={path.points}
           color={path.color}
           lineWidth={
-            path.highlighted
-              ? Math.min(5.2, 2.1 + path.strength)
+            path.relatedToFocus
+              ? Math.min(5, 1.8 + path.strength)
               : Math.min(4.5, 1.2 + path.strength * 0.75)
           }
           transparent
           opacity={
-            path.highlighted
-              ? 0.88
-              : highlightIds.size > 0
-                ? 0.18
+            path.relatedToFocus
+              ? 0.85
+              : focusFamilyId
+                ? 0.16
                 : path.strength > 1
                   ? 0.72
                   : 0.42
           }
-          dashed={!path.highlighted && path.strength === 1}
+          dashed={!path.relatedToFocus && path.strength === 1}
           dashScale={2.2}
           dashSize={0.35}
           gapSize={0.22}
@@ -114,6 +113,7 @@ export function VillageAtlas({
   const router = useRouter();
   const { user, requireAuth } = useAuth();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [expandedChildId, setExpandedChildId] = useState<string | null>(null);
   const [positions, setPositions] = useState<Record<string, { x: number; z: number }>>({});
   const [orbitEnabled, setOrbitEnabled] = useState(true);
   const [dpr, setDpr] = useHdDpr();
@@ -131,6 +131,8 @@ export function VillageAtlas({
     };
   }, [fullscreen]);
 
+  const childrenByPerson = families[0]?.children_by_person ?? {};
+
   const islands: IslandData[] = useMemo(
     () =>
       families.map((f, i) => {
@@ -147,7 +149,6 @@ export function VillageAtlas({
             familyId: link.family_id,
             strength: link.strength,
           })),
-          offspringFamilyIds: f.offspring_family_ids ?? [],
           childPeople: (f.child_people ?? []).map((child) => ({
             id: child.id,
             fullName: child.full_name,
@@ -165,31 +166,43 @@ export function VillageAtlas({
   const selected = families.find((f) => f.id === selectedId) ?? null;
   const selectedIsland = islands.find((i) => i.id === selectedId) ?? null;
 
-  const bloom = useMemo(() => {
-    if (!selectedIsland) {
-      return {
-        origin: null as { x: number; z: number } | null,
-        offspringIds: [] as string[],
-        sameFamilyChildren: [] as Array<{ id: string; fullName: string }>,
-        highlightIds: new Set<string>(),
-      };
-    }
-    const offspringIds = selectedIsland.offspringFamilyIds;
-    const sameFamilyChildren = selectedIsland.childPeople
-      .filter((child) => child.familyId === selectedIsland.id)
-      .map((child) => ({ id: child.id, fullName: child.fullName }));
-    const highlightIds = new Set<string>([selectedIsland.id, ...offspringIds]);
-    return {
-      origin: { x: selectedIsland.x, z: selectedIsland.z },
-      offspringIds,
-      sameFamilyChildren,
-      highlightIds,
-    };
+  const familyChildren = useMemo(() => {
+    if (!selectedIsland) return [] as Array<{ id: string; fullName: string }>;
+    return selectedIsland.childPeople.map((c) => ({
+      id: c.id,
+      fullName: c.fullName,
+    }));
   }, [selectedIsland]);
 
+  const grandchildBloom = useMemo(() => {
+    if (!selectedIsland || !expandedChildId) return null;
+    const kids = childrenByPerson[expandedChildId] ?? [];
+    if (kids.length === 0) return null;
+
+    const n = Math.max(familyChildren.length, 1);
+    const idx = Math.max(
+      0,
+      familyChildren.findIndex((c) => c.id === expandedChildId),
+    );
+    const radius = 2.05 + Math.min(n, 8) * 0.18;
+    const angle = (idx / n) * Math.PI * 2 - Math.PI / 2;
+    return {
+      origin: {
+        x: selectedIsland.x + Math.cos(angle) * radius,
+        z: selectedIsland.z + Math.sin(angle) * radius,
+      },
+      people: kids.map((k) => ({ id: k.id, fullName: k.full_name })),
+    };
+  }, [selectedIsland, expandedChildId, childrenByPerson, familyChildren]);
+
   useEffect(() => {
+    setExpandedChildId(null);
     if (selectedId) setBloomKey((k) => k + 1);
   }, [selectedId]);
+
+  useEffect(() => {
+    if (expandedChildId) setBloomKey((k) => k + 1);
+  }, [expandedChildId]);
 
   const atlasView = useMemo(() => {
     if (islands.length === 0) return { x: 0, z: 0, distance: 12 };
@@ -216,6 +229,19 @@ export function VillageAtlas({
     else router.refresh();
   }
 
+  function handleSelectFamily(id: string) {
+    setSelectedId(id);
+  }
+
+  function handleSelectChild(personId: string) {
+    setExpandedChildId((prev) => (prev === personId ? null : personId));
+  }
+
+  function clearSelection() {
+    setSelectedId(null);
+    setExpandedChildId(null);
+  }
+
   const shellClass = fullscreen
     ? "fixed inset-0 z-[25] bg-[#E8ECF1]"
     : "relative mb-8 overflow-hidden rounded-[20px] border border-border-soft bg-[#E8ECF1]";
@@ -224,9 +250,9 @@ export function VillageAtlas({
     ? "atlas-touch-lock absolute inset-0 h-full w-full"
     : "atlas-touch-lock h-[min(68vh,580px)] w-full";
 
-  const childCount =
-    (selected?.offspring_family_ids?.length ?? 0) +
-    (selectedIsland?.childPeople.filter((c) => c.familyId === selectedIsland.id).length ?? 0);
+  const childCount = familyChildren.length;
+  const expandedLabel =
+    familyChildren.find((c) => c.id === expandedChildId)?.fullName ?? null;
 
   if (families.length === 0) {
     return (
@@ -272,7 +298,7 @@ export function VillageAtlas({
             toneMappingExposure: 1.05,
             outputColorSpace: THREE.SRGBColorSpace,
           }}
-          onPointerMissed={() => setSelectedId(null)}
+          onPointerMissed={clearSelection}
           onCreated={({ gl, scene }) => {
             gl.setClearColor(new THREE.Color("#E8ECF1"));
             gl.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -295,38 +321,39 @@ export function VillageAtlas({
               blur={2.2}
               far={14}
             />
-            <KinshipPaths islands={islands} highlightIds={bloom.highlightIds} />
-            {islands.map((island) => {
-              const isOffspring = bloom.offspringIds.includes(island.id);
-              const isSelected = island.id === selectedId;
-              const dimmed =
-                Boolean(selectedId) &&
-                !isSelected &&
-                !isOffspring;
-              const spawnIndex = bloom.offspringIds.indexOf(island.id);
-              return (
-                <ClanIsland
-                  key={island.id}
-                  data={island}
-                  selected={isSelected}
-                  showLabel={islands.length <= 10 || isSelected || isOffspring}
-                  onSelect={setSelectedId}
-                  onDragEnd={(id, x, z) => void persistPosition(id, x, z)}
-                  draggable={Boolean(user) && !selectedId}
-                  onDragState={(d) => setOrbitEnabled(!d)}
-                  spawnFrom={isOffspring ? bloom.origin : null}
-                  spawnDelay={isOffspring ? spawnIndex * 70 : 0}
-                  spawnActive={isOffspring && bloomKey > 0}
-                  dimmed={dimmed}
-                />
-              );
-            })}
-            {bloom.origin && (
+            <KinshipPaths islands={islands} focusFamilyId={selectedId} />
+            {islands.map((island) => (
+              <ClanIsland
+                key={island.id}
+                data={island}
+                selected={island.id === selectedId}
+                onSelect={handleSelectFamily}
+                onDragEnd={(id, x, z) => void persistPosition(id, x, z)}
+                draggable={Boolean(user) && !selectedId}
+                onDragState={(d) => setOrbitEnabled(!d)}
+                dimmed={Boolean(selectedId) && island.id !== selectedId}
+              />
+            ))}
+            {selectedIsland && (
               <ChildCottageBloom
                 key={`bloom-${selectedId}-${bloomKey}`}
-                origin={bloom.origin}
-                people={bloom.sameFamilyChildren}
+                origin={{ x: selectedIsland.x, z: selectedIsland.z }}
+                people={familyChildren}
                 active={Boolean(selectedId)}
+                expandedId={expandedChildId}
+                onSelectPerson={handleSelectChild}
+              />
+            )}
+            {grandchildBloom && (
+              <ChildCottageBloom
+                key={`grand-${selectedId}-${expandedChildId}-${bloomKey}`}
+                origin={grandchildBloom.origin}
+                people={grandchildBloom.people}
+                active
+                expandedId={null}
+                onSelectPerson={() => {
+                  /* grandchildren stay compact; expand stays on parent cottage */
+                }}
               />
             )}
           </Suspense>
@@ -390,7 +417,7 @@ export function VillageAtlas({
               <button
                 type="button"
                 className="text-[12px] text-text-secondary hover:text-text"
-                onClick={() => setSelectedId(null)}
+                onClick={clearSelection}
               >
                 Kapat
               </button>
@@ -408,28 +435,19 @@ export function VillageAtlas({
             {selected.notes && (
               <p className="mt-2 line-clamp-3 text-[13px] text-text-secondary">{selected.notes}</p>
             )}
-            <p className="mt-2 text-[12px] leading-relaxed text-text-tertiary">
-              {selectedIsland.generationCount === 0
-                ? "Temel atıldı. İlk kişi eklendiğinde ocak bir eve dönüşür."
-                : selectedIsland.generationCount === 1
-                  ? "İlk nesil kayıtlı. Yeni kuşaklarla bu ocak büyüyecek."
-                  : selectedIsland.generationCount === 2
-                    ? "İki nesil birbirine bağlandı; aile yerleşkesi gelişiyor."
-                    : "Üç veya daha fazla nesil: köklü aile yerleşkesi."}
-            </p>
             {childCount > 0 ? (
               <p className="mt-2 rounded-[10px] bg-[#EAF4F1] px-2.5 py-2 text-[11px] font-medium text-[#286F61]">
-                {bloom.sameFamilyChildren.length > 0 && (
-                  <>{bloom.sameFamilyChildren.length} çocuk ocağı açıldı</>
-                )}
-                {bloom.sameFamilyChildren.length > 0 && bloom.offspringIds.length > 0 && " · "}
-                {bloom.offspringIds.length > 0 && (
-                  <>{bloom.offspringIds.length} ayrı aile evi bu ocaktan çıktı</>
-                )}
+                {expandedLabel
+                  ? `${expandedLabel} seçili${
+                      grandchildBloom
+                        ? ` · ${grandchildBloom.people.length} çocuğu açıldı`
+                        : " · tam ocak"
+                    }`
+                  : `${childCount} çocuk ocağı bu aileden çıktı · tıklayınca büyür`}
               </p>
             ) : (
               <p className="mt-2 rounded-[10px] bg-[#F3F4F6] px-2.5 py-2 text-[11px] font-medium text-text-tertiary">
-                Henüz ocağa çıkmış çocuk kaydı yok
+                Henüz çocuk kaydı yok
               </p>
             )}
             {(selected.kinship_links?.length ?? 0) > 0 && (

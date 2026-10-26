@@ -27,6 +27,7 @@ Supabase Dashboard → SQL Editor → sırayla çalıştır:
 5. `supabase/migrations/004_heritage_archive.sql` (hafıza arşivi + çift adlı köyler)
 6. `supabase/migrations/005_relation_integrity.sql` (soy ağacı döngü ve yinelenen eş bağlantısı koruması)
 7. `supabase/migrations/006_heritage_comments.sql` (arşiv kayıtlarına tanıklık ve kaynak notu yorumları)
+8. `supabase/migrations/007_person_generation.sql` (kişinin düzeltilebilir nesil numarası)
 
 ### 2) Google Auth
 

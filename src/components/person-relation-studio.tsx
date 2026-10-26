@@ -355,10 +355,12 @@ export function PersonRelationStudio({
     }
 
     const payload = draftToPayload(draft, avatarUrl);
+    // Always attach new people to this family page — never the focused
+    // relative's other family (e.g. spouse from Abdulbari).
     const { data: created, error: err } = await supabase
       .from("people")
       .insert({
-        family_id: focus.family_id || familyId,
+        family_id: familyId,
         ...payload,
         created_by: user.id,
       })
@@ -448,12 +450,16 @@ export function PersonRelationStudio({
     await supabase
       .from("families")
       .update({ is_incomplete: false })
-      .eq("id", focus.family_id || familyId);
+      .eq("id", familyId);
 
     setBusy(false);
     setDraft(emptyDraft());
     setAddRole(null);
-    setFocusId(created.id);
+    // Stay on the person we were editing when adding children (or a sibling);
+    // jump to the new person only for parent/spouse so the map follows them.
+    if (addRole === "parent" || addRole === "spouse") {
+      setFocusId(created.id);
+    }
     router.refresh();
   }
 

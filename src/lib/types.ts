@@ -79,6 +79,11 @@ export type Family = {
   offspring_family_ids?: string[];
   /** Direct children of people in this family (1st degree only). */
   child_people?: Array<{ id: string; full_name: string; family_id: string }>;
+  /**
+   * Village-scoped map: parent person id → their direct children.
+   * Same object reference attached on every family from getFamiliesByVillage.
+   */
+  children_by_person?: Record<string, Array<{ id: string; full_name: string }>>;
 };
 
 export type Person = {
@@ -90,6 +95,8 @@ export type Person = {
   gender: "male" | "female" | "other" | "unknown" | null;
   notes: string | null;
   avatar_url?: string | null;
+  /** Manual override: 1 = founding generation. Null = derive from parents. */
+  generation?: number | null;
   disputed: boolean;
   created_by: string | null;
   created_at: string;

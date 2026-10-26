@@ -2,10 +2,17 @@
 
 import { useAuth } from "@/components/auth-provider";
 import { Button, Input, Textarea } from "@/components/ui";
+import { clearAuthDraft, loadAuthDraft, saveAuthDraft } from "@/lib/auth-draft";
 import { normalizeFamilyName } from "@/lib/family-name";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+type FamilyDraft = {
+  name: string;
+  aka: string;
+  notes: string;
+};
 
 export function CreateFamilyForm({
   villageId,
@@ -16,61 +23,96 @@ export function CreateFamilyForm({
   stayOnVillage?: boolean;
   onCreated?: (familyId: string) => void;
 }) {
-  const { requireAuth } = useAuth();
+  const draftKey = `create-family:${villageId}`;
+  const { user, requireAuth } = useAuth();
   const router = useRouter();
   const [name, setName] = useState("");
   const [aka, setAka] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [restoredNotice, setRestoredNotice] = useState(false);
+  const resumed = useRef(false);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const ok = await requireAuth();
-    if (!ok) return;
-    const cleaned = normalizeFamilyName(name);
+  useEffect(() => {
+    const draft = loadAuthDraft<FamilyDraft>(draftKey);
+    if (!draft) return;
+    setName(draft.data.name ?? "");
+    setAka(draft.data.aka ?? "");
+    setNotes(draft.data.notes ?? "");
+    setRestoredNotice(true);
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (!user || resumed.current) return;
+    const draft = loadAuthDraft<FamilyDraft>(draftKey);
+    if (!draft?.resumeSubmit) return;
+    resumed.current = true;
+    clearAuthDraft(draftKey);
+    void performSubmit(draft.data);
+  }, [user, draftKey]);
+
+  async function performSubmit(data: FamilyDraft) {
+    const cleaned = normalizeFamilyName(data.name);
     if (!cleaned) return;
 
     setBusy(true);
     setError(null);
     const supabase = createClient();
     const {
-      data: { user },
+      data: { user: u },
     } = await supabase.auth.getUser();
-    if (!user) {
+    if (!u) {
       setBusy(false);
       return;
     }
 
-    const { data, error: err } = await supabase
+    const { data: row, error: err } = await supabase
       .from("families")
       .insert({
         village_id: villageId,
         name: cleaned,
-        aka: aka.trim() || null,
-        notes: notes.trim() || null,
+        aka: data.aka.trim() || null,
+        notes: data.notes.trim() || null,
         is_incomplete: true,
-        created_by: user.id,
+        created_by: u.id,
       })
       .select("id")
       .single();
 
     setBusy(false);
-    if (err || !data) {
+    if (err || !row) {
       setError(err?.message ?? "Aile eklenemedi");
       return;
     }
 
+    clearAuthDraft(draftKey);
     setName("");
     setAka("");
     setNotes("");
-    onCreated?.(data.id);
-    if (!stayOnVillage) router.push(`/family/${data.id}`);
+    setRestoredNotice(false);
+    onCreated?.(row.id);
+    if (!stayOnVillage) router.push(`/family/${row.id}`);
     router.refresh();
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const data: FamilyDraft = { name, aka, notes };
+    saveAuthDraft(draftKey, data, true);
+    const ok = await requireAuth();
+    if (!ok) return;
+    clearAuthDraft(draftKey);
+    await performSubmit(data);
   }
 
   return (
     <form onSubmit={(e) => void onSubmit(e)} className="space-y-3">
+      {restoredNotice && (
+        <p className="rounded-[12px] bg-[#EAF4F1] px-3 py-2 text-[12px] font-medium text-[#286F61]">
+          Girişten önce yazdığın bilgiler geri yüklendi.
+        </p>
+      )}
       <div>
         <label className="mb-1.5 block text-[12px] font-medium text-text-secondary">
           Aile adı

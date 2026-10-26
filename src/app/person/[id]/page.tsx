@@ -14,6 +14,11 @@ import {
   getPersonById,
   getRelationshipGraph,
 } from "@/lib/data";
+import {
+  generationKinLabel,
+  linksForPerson,
+  resolvePersonGeneration,
+} from "@/lib/tree";
 import { formatYearRange } from "@/lib/utils";
 
 export const revalidate = 20;
@@ -44,13 +49,9 @@ export default async function PersonPage({
   const relations = relationshipGraph.relations;
   const comments = await getComments("person", person.id);
 
-  const nameById = new Map(people.map((p) => [p.id, p.full_name]));
-  const parents = relations
-    .filter((r) => r.relation_type === "parent")
-    .map((r) => ({
-      id: r.related_person_id,
-      name: nameById.get(r.related_person_id) ?? "Bilinmiyor",
-    }));
+  const links = linksForPerson(person.id, people, relations);
+  const familyPeople = people.filter((p) => p.family_id === person.family_id);
+  const generation = resolvePersonGeneration(person.id, familyPeople, relations);
 
   return (
     <div>
@@ -85,6 +86,7 @@ export default async function PersonPage({
       <div className="mb-6 flex flex-wrap gap-2">
         {person.disputed && <Badge tone="warn">Bilgi tartışmalı</Badge>}
         {person.gender && <Badge>{person.gender}</Badge>}
+        <Badge>{generationKinLabel(generation)}</Badge>
       </div>
 
       <Surface className="mb-6">
@@ -97,14 +99,37 @@ export default async function PersonPage({
         </div>
       </Surface>
 
-      {parents.length > 0 && (
+      {links.parents.length > 0 && (
         <Surface className="mb-6">
           <h2 className="text-[15px] font-semibold">Ebeveynler</h2>
-          <ul className="mt-3 space-y-2">
-            {parents.map((p) => (
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            {links.parents.map((p) => (
               <li key={p.id}>
-                <Link href={`/person/${p.id}`} className="text-[14px] font-medium hover:underline">
-                  {p.name}
+                <Link
+                  href={`/person/${p.id}`}
+                  className="flex items-center justify-between rounded-[14px] border border-border-soft bg-bg-elevated/50 px-3.5 py-2.5 text-[14px] font-medium transition hover:border-[#9BC4B8]/50 hover:bg-white"
+                >
+                  <span>{p.full_name}</span>
+                  <span className="text-[11px] text-text-tertiary">Ebeveyn</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Surface>
+      )}
+
+      {links.children.length > 0 && (
+        <Surface className="mb-6">
+          <h2 className="text-[15px] font-semibold">Çocuklar</h2>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            {links.children.map((p) => (
+              <li key={p.id}>
+                <Link
+                  href={`/person/${p.id}`}
+                  className="flex items-center justify-between rounded-[14px] border border-border-soft bg-bg-elevated/50 px-3.5 py-2.5 text-[14px] font-medium transition hover:border-[#9BC4B8]/50 hover:bg-white"
+                >
+                  <span>{p.full_name}</span>
+                  <span className="text-[11px] text-text-tertiary">Çocuk</span>
                 </Link>
               </li>
             ))}
