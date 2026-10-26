@@ -124,6 +124,7 @@ export function ClanIsland({
   dimmed?: boolean;
 }) {
   const group = useRef<THREE.Group>(null);
+  const body = useRef<THREE.Group>(null);
   const settlement = useRef<THREE.Group>(null);
   const materials = useRef<THREE.MeshStandardMaterial[]>([]);
   const [hovered, setHovered] = useState(false);
@@ -133,9 +134,9 @@ export function ClanIsland({
   const hit = useMemo(() => new THREE.Vector3(), []);
 
   useEffect(() => {
-    if (!group.current) return;
+    if (!body.current) return;
     const mats: THREE.MeshStandardMaterial[] = [];
-    group.current.traverse((obj) => {
+    body.current.traverse((obj) => {
       if (obj instanceof THREE.Mesh && obj.material instanceof THREE.MeshStandardMaterial) {
         mats.push(obj.material);
       }
@@ -175,7 +176,7 @@ export function ClanIsland({
     group.current.position.x = data.x;
     group.current.position.z = data.z;
     group.current.position.y = Math.sin(t * 0.7 + data.seed) * 0.06;
-    group.current.scale.setScalar(restScale);
+    if (body.current) body.current.scale.setScalar(restScale);
 
     if (settlement.current) {
       const target = selected ? 1.1 : hovered ? 1.06 : 1;
@@ -222,7 +223,6 @@ export function ClanIsland({
     <group
       ref={group}
       position={[data.x, 0, data.z]}
-      scale={restScale}
       onPointerDown={pointerDown}
       onPointerMove={pointerMove}
       onPointerUp={pointerUp}
@@ -236,57 +236,67 @@ export function ClanIsland({
         document.body.style.cursor = "auto";
       }}
     >
-      <mesh castShadow receiveShadow position={[0, 0.12, 0]}>
-        <cylinderGeometry args={[1.4, 1.58, 0.24, 64]} />
-        <meshStandardMaterial
-          color={selected || hovered ? "#F9FCFF" : colors.land}
-          roughness={0.7}
-          metalness={0.12}
-          transparent
-        />
-      </mesh>
-      <mesh position={[0, -0.015, 0]}>
-        <cylinderGeometry args={[1.52, 1.72, 0.16, 64]} />
-        <meshStandardMaterial color="#96A3B2" roughness={0.94} transparent />
-      </mesh>
+      <group ref={body} scale={restScale}>
+        <mesh castShadow receiveShadow position={[0, 0.12, 0]}>
+          <cylinderGeometry args={[1.4, 1.58, 0.24, 64]} />
+          <meshStandardMaterial
+            color={selected || hovered ? "#F9FCFF" : colors.land}
+            roughness={0.7}
+            metalness={0.12}
+            transparent
+          />
+        </mesh>
+        <mesh position={[0, -0.015, 0]}>
+          <cylinderGeometry args={[1.52, 1.72, 0.16, 64]} />
+          <meshStandardMaterial color="#96A3B2" roughness={0.94} transparent />
+        </mesh>
 
-      <group ref={settlement}>
-        {stage === 0 ? (
-          <>
-            <mesh position={[0, 0.31, 0]} castShadow>
-              <cylinderGeometry args={[0.48, 0.58, 0.2, 18]} />
-              <meshStandardMaterial color="#D7DEE7" roughness={0.8} transparent />
-            </mesh>
-            <mesh position={[0, 0.5, 0]} castShadow>
-              <sphereGeometry args={[0.15, 24, 18]} />
-              <meshStandardMaterial
-                color="#FFB454"
-                emissive="#FF7A2F"
-                emissiveIntensity={0.8}
-                transparent
-              />
-            </mesh>
-          </>
-        ) : (
-          <SettlementProps roof={colors.roof} />
+        <group ref={settlement}>
+          {stage === 0 ? (
+            <>
+              <mesh position={[0, 0.31, 0]} castShadow>
+                <cylinderGeometry args={[0.48, 0.58, 0.2, 18]} />
+                <meshStandardMaterial color="#D7DEE7" roughness={0.8} transparent />
+              </mesh>
+              <mesh position={[0, 0.5, 0]} castShadow>
+                <sphereGeometry args={[0.15, 24, 18]} />
+                <meshStandardMaterial
+                  color="#FFB454"
+                  emissive="#FF7A2F"
+                  emissiveIntensity={0.8}
+                  transparent
+                />
+              </mesh>
+            </>
+          ) : (
+            <SettlementProps roof={colors.roof} />
+          )}
+        </group>
+
+        {selected && (
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
+            <ringGeometry args={[1.62, 1.78, 64]} />
+            <meshBasicMaterial color="#5B6B7C" transparent opacity={0.5} />
+          </mesh>
         )}
       </group>
 
-      <Html distanceFactor={9} position={[0, 1.62, 0]} center>
-        <div className="pointer-events-none whitespace-nowrap rounded-full border border-white/70 bg-white/95 px-3 py-1.5 text-[12px] font-semibold tracking-[-0.02em] text-text shadow-[0_8px_24px_rgba(31,42,55,0.16)] backdrop-blur-xl">
+      {/* Label outside body scale so the family name stays readable */}
+      <Html
+        position={[0, 2.15, 0]}
+        center
+        distanceFactor={6}
+        occlude={false}
+        zIndexRange={[100, 0]}
+        style={{ pointerEvents: "none" }}
+      >
+        <div className="pointer-events-none whitespace-nowrap rounded-full border border-white/80 bg-white/95 px-3.5 py-1.5 text-[13px] font-semibold tracking-[-0.02em] text-text shadow-[0_10px_28px_rgba(31,42,55,0.18)] backdrop-blur-xl">
           {data.name}
           <span className="ml-1.5 text-[10px] font-medium text-text-tertiary">
             {stage === 0 ? "temel" : `${data.generationCount} nesil`}
           </span>
         </div>
       </Html>
-
-      {selected && (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
-          <ringGeometry args={[1.62, 1.78, 64]} />
-          <meshBasicMaterial color="#5B6B7C" transparent opacity={0.5} />
-        </mesh>
-      )}
     </group>
   );
 }

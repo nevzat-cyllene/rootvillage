@@ -18,7 +18,7 @@ export default async function VillagesPage({
   return (
     <div>
       <PageHeader
-        eyebrow="Yerler · soylar · anlatılar"
+        eyebrow="Yerler · aşiretler · anlatılar"
         title="Köyler ve sülaleler"
         description="Köy kayıtları, ailelerin ve kişilerin bağlandığı ana yapı olarak korunur. Yer ve kültür kayıtları için Hafıza Arşivi genişliyor."
         actions={

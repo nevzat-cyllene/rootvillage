@@ -1,6 +1,6 @@
 # Dîwan
 
-Yerlerin, soyların, anlatıların ve kültürel mirasın birlikte kayda geçtiği ortak hafıza platformu.
+Yerlerin, aşiretlerin, anlatıların ve kültürel mirasın birlikte kayda geçtiği ortak hafıza platformu.
 
 - Köy → aile → kişi → akrabalık haritası
 - Bölge, şehir, mezra, yapı, tarihî olay, hikâye, alıntı ve kültürel öğeler için Hafıza Arşivi

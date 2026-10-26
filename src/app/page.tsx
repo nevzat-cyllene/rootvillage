@@ -9,7 +9,7 @@ export const revalidate = 60;
 
 const memoryPaths = [
   { label: "Yerler", detail: "Bölge, şehir, köy, mezra ve tarihî yapılar", href: "/archive#yeni" },
-  { label: "Soylar", detail: "Aileler, sülaleler, kişiler ve bağları", href: "/villages" },
+  { label: "Aşiretler", detail: "Aileler, sülaleler, kişiler ve bağları", href: "/villages" },
   { label: "Anlatılar", detail: "Olaylar, tanıklıklar, alıntılar ve kültürel izler", href: "/archive#yeni" },
 ];
 

@@ -77,7 +77,7 @@ export type Family = {
   kinship_links?: Array<{ family_id: string; strength: number }>;
   /** Families founded by / containing direct children of people in this family. */
   offspring_family_ids?: string[];
-  /** Direct children of people in this family (1st degree only). */
+  /** Direct children of founding members only (atlas bloom; not grandchildren). */
   child_people?: Array<{ id: string; full_name: string; family_id: string }>;
   /**
    * Village-scoped map: parent person id → their direct children.

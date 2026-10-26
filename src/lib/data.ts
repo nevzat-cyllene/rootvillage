@@ -153,11 +153,6 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
   const familyLinkCounts = new Map<string, number>();
   /** parentFamilyId → child family ids (cross-family only) */
   const offspringByFamily = new Map<string, Set<string>>();
-  /** parentFamilyId → direct child people (deduped by child id) */
-  const childrenByFamily = new Map<
-    string,
-    Map<string, { id: string; full_name: string; family_id: string }>
-  >();
   /** parentPersonId → direct children (deduped) */
   const childrenByPersonMaps = new Map<
     string,
@@ -184,10 +179,6 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
 
     const childName = nameByPerson.get(childId);
     if (childName) {
-      const familyBucket = childrenByFamily.get(parentFamily) ?? new Map();
-      familyBucket.set(childId, { id: childId, full_name: childName, family_id: childFamily });
-      childrenByFamily.set(parentFamily, familyBucket);
-
       const personBucket = childrenByPersonMaps.get(parentId) ?? new Map();
       personBucket.set(childId, { id: childId, full_name: childName });
       childrenByPersonMaps.set(parentId, personBucket);
@@ -209,6 +200,34 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
   const childrenByPerson: Record<string, Array<{ id: string; full_name: string }>> = {};
   for (const [parentId, kids] of childrenByPersonMaps) {
     childrenByPerson[parentId] = [...kids.values()];
+  }
+
+  /**
+   * Atlas bloom children: only direct kids of founding members
+   * (no in-family parent). Avoids flooding the map with grandchildren.
+   */
+  const founderChildrenByFamily = new Map<
+    string,
+    Map<string, { id: string; full_name: string; family_id: string }>
+  >();
+  for (const familyId of familyIds) {
+    const members = peopleRows.filter((person) => person.family_id === familyId);
+    const founders = members.filter(
+      (person) => (parentsByChild.get(person.id) ?? []).length === 0,
+    );
+    const bucket = new Map<string, { id: string; full_name: string; family_id: string }>();
+    for (const founder of founders) {
+      for (const child of childrenByPersonMaps.get(founder.id)?.values() ?? []) {
+        const childFamily = familyByPerson.get(child.id);
+        if (!childFamily) continue;
+        bucket.set(child.id, {
+          id: child.id,
+          full_name: child.full_name,
+          family_id: childFamily,
+        });
+      }
+    }
+    founderChildrenByFamily.set(familyId, bucket);
   }
 
   const depthMemo = new Map<string, number>();
@@ -269,7 +288,7 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
       kinship_cluster: clusterRoots.includes(root) ? clusterRoots.indexOf(root) : null,
       kinship_links: kinshipLinks,
       offspring_family_ids: [...(offspringByFamily.get(family.id) ?? [])],
-      child_people: [...(childrenByFamily.get(family.id)?.values() ?? [])],
+      child_people: [...(founderChildrenByFamily.get(family.id)?.values() ?? [])],
       children_by_person: childrenByPerson,
     };
   });
