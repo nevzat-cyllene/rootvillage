@@ -1,6 +1,6 @@
-# Dîwan
+# Şop
 
-Yerlerin, aşiretlerin, anlatıların ve kültürel mirasın birlikte kayda geçtiği ortak hafıza platformu.
+Kürtlerin yerlerini, ailelerini, anlatılarını ve kültürel mirasını ilişkilendiren yaşayan hafıza atlası.
 
 - Köy → aile → kişi → akrabalık haritası
 - Bölge, şehir, mezra, yapı, tarihî olay, hikâye, alıntı ve kültürel öğeler için Hafıza Arşivi
@@ -28,6 +28,7 @@ Supabase Dashboard → SQL Editor → sırayla çalıştır:
 6. `supabase/migrations/005_relation_integrity.sql` (soy ağacı döngü ve yinelenen eş bağlantısı koruması)
 7. `supabase/migrations/006_heritage_comments.sql` (arşiv kayıtlarına tanıklık ve kaynak notu yorumları)
 8. `supabase/migrations/007_person_generation.sql` (kişinin düzeltilebilir nesil numarası)
+9. `supabase/migrations/008_family_founder.sql` (aile kurucusu + kişi/ilişki/aile verisini sıfırlar; köyler kalır)
 
 ### 2) Google Auth
 

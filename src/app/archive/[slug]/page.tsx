@@ -17,7 +17,7 @@ export async function generateMetadata({
   if (!entry) return { title: "Kayıt bulunamadı" };
   return {
     title: entry.title,
-    description: entry.summary ?? `${entry.title} · Dîwan Hafıza Arşivi`,
+    description: entry.summary ?? `${entry.title} · Şop Hafıza Arşivi`,
   };
 }
 

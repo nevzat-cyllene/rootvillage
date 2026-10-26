@@ -149,7 +149,6 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
     .or(`person_id.in.(${personIds.join(",")}),related_person_id.in.(${personIds.join(",")})`)
     .is("deleted_at", null);
 
-  const parentsByChild = new Map<string, string[]>();
   const familyLinkCounts = new Map<string, number>();
   /** parentFamilyId → child family ids (cross-family only) */
   const offspringByFamily = new Map<string, Set<string>>();
@@ -189,12 +188,6 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
       set.add(childFamily);
       offspringByFamily.set(parentFamily, set);
     }
-
-    // Same-family parents only for generation depth (existing behavior)
-    if (childFamily !== parentFamily) continue;
-    const current = parentsByChild.get(childId) ?? [];
-    current.push(parentId);
-    parentsByChild.set(childId, current);
   }
 
   const childrenByPerson: Record<string, Array<{ id: string; full_name: string }>> = {};
@@ -203,21 +196,17 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
   }
 
   /**
-   * Atlas bloom children: only direct kids of founding members
-   * (no in-family parent). Avoids flooding the map with grandchildren.
+   * Atlas bloom: only direct children of families.founder_person_id.
    */
   const founderChildrenByFamily = new Map<
     string,
     Map<string, { id: string; full_name: string; family_id: string }>
   >();
-  for (const familyId of familyIds) {
-    const members = peopleRows.filter((person) => person.family_id === familyId);
-    const founders = members.filter(
-      (person) => (parentsByChild.get(person.id) ?? []).length === 0,
-    );
+  for (const family of families) {
     const bucket = new Map<string, { id: string; full_name: string; family_id: string }>();
-    for (const founder of founders) {
-      for (const child of childrenByPersonMaps.get(founder.id)?.values() ?? []) {
+    const founderId = family.founder_person_id;
+    if (founderId) {
+      for (const child of childrenByPersonMaps.get(founderId)?.values() ?? []) {
         const childFamily = familyByPerson.get(child.id);
         if (!childFamily) continue;
         bucket.set(child.id, {
@@ -227,22 +216,27 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
         });
       }
     }
-    founderChildrenByFamily.set(familyId, bucket);
+    founderChildrenByFamily.set(family.id, bucket);
   }
 
-  const depthMemo = new Map<string, number>();
-  const generationDepth = (personId: string, path = new Set<string>()): number => {
-    const memoized = depthMemo.get(personId);
-    if (memoized) return memoized;
-    if (path.has(personId)) return 1;
-
-    const nextPath = new Set(path).add(personId);
-    const parents = parentsByChild.get(personId) ?? [];
-    const depth = parents.length === 0
-      ? 1
-      : 1 + Math.max(...parents.map((parentId) => generationDepth(parentId, nextPath)));
-    depthMemo.set(personId, depth);
-    return depth;
+  /** Max generation depth from founder down (BFS). */
+  const generationCountFromFounder = (founderId: string | null | undefined): number => {
+    if (!founderId) return 0;
+    const depth = new Map<string, number>([[founderId, 1]]);
+    const queue = [founderId];
+    let max = 1;
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const d = depth.get(current) ?? 1;
+      for (const child of childrenByPersonMaps.get(current)?.values() ?? []) {
+        if (depth.has(child.id)) continue;
+        const next = d + 1;
+        depth.set(child.id, next);
+        if (next > max) max = next;
+        queue.push(child.id);
+      }
+    }
+    return max;
   };
 
   const clusterParent = new Map(familyIds.map((id) => [id, id]));
@@ -280,16 +274,20 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
       return [];
     });
     const root = findCluster(family.id);
+    const hasFounder = Boolean(family.founder_person_id);
     return {
       ...family,
       generation_count: familyPeople.length === 0
         ? 0
-        : Math.max(...familyPeople.map((person) => generationDepth(person.id))),
+        : hasFounder
+          ? generationCountFromFounder(family.founder_person_id)
+          : 1,
       kinship_cluster: clusterRoots.includes(root) ? clusterRoots.indexOf(root) : null,
       kinship_links: kinshipLinks,
       offspring_family_ids: [...(offspringByFamily.get(family.id) ?? [])],
       child_people: [...(founderChildrenByFamily.get(family.id)?.values() ?? [])],
       children_by_person: childrenByPerson,
+      is_incomplete: family.is_incomplete || !hasFounder,
     };
   });
 }

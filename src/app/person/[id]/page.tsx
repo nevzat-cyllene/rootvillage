@@ -51,7 +51,13 @@ export default async function PersonPage({
 
   const links = linksForPerson(person.id, people, relations);
   const familyPeople = people.filter((p) => p.family_id === person.family_id);
-  const generation = resolvePersonGeneration(person.id, familyPeople, relations);
+  const generation = resolvePersonGeneration(
+    person.id,
+    familyPeople,
+    relations,
+    new Map(),
+    family?.founder_person_id,
+  );
 
   return (
     <div>
@@ -74,8 +80,8 @@ export default async function PersonPage({
         actions={
           <>
             <ShareButton
-              title={`${person.full_name} · Dîwan`}
-              text={`${person.full_name} hakkında Dîwan kaydı`}
+              title={`${person.full_name} · Şop`}
+              text={`${person.full_name} hakkında Şop kaydı`}
             />
             <DisputeToggle table="people" id={person.id} disputed={person.disputed} />
             <SoftDeleteButton table="people" id={person.id} />

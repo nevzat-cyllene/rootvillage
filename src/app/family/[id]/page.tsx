@@ -74,8 +74,8 @@ export default async function FamilyPage({
         actions={
           <>
             <ShareButton
-              title={`${family.name} ailesi · Dîwan`}
-              text={`“${family.name}” aile kaydı · Dîwan`}
+              title={`${family.name} ailesi · Şop`}
+              text={`“${family.name}” aile kaydı · Şop`}
               label="Aileyi paylaş"
             />
             <DisputeToggle table="families" id={family.id} disputed={family.disputed} />
@@ -86,8 +86,14 @@ export default async function FamilyPage({
 
       <div className="mb-4 flex flex-wrap gap-2">
         {family.disputed && <Badge tone="warn">Bilgi tartışmalı</Badge>}
-        {(family.is_incomplete || people.length === 0) && (
+        {(family.is_incomplete || people.length === 0 || !family.founder_person_id) && (
           <Badge tone="accent">Doldurulmayı bekliyor</Badge>
+        )}
+        {family.founder_person_id && (
+          <Badge tone="accent">
+            Kurucu:{" "}
+            {people.find((p) => p.id === family.founder_person_id)?.full_name ?? "atanmış"}
+          </Badge>
         )}
         <Badge>{people.length} kişi</Badge>
       </div>
@@ -97,12 +103,13 @@ export default async function FamilyPage({
         people={relationshipGraph.people}
         homePeople={people}
         relations={relations}
+        founderPersonId={family.founder_person_id}
       />
 
       {people.length === 0 ? (
         <EmptyState
           title="Henüz kimse yok"
-          description="Önce aşağıdan ilk kişiyi ekle (kendin, amcan, kim olursa). Sonra ağaçta + Ebeveyn / + Çocuk / + Kardeş ile büyüt."
+          description="İlk eklenen kişi ailenin kurucusu olur (ör. Hacı Mehmet). Sonra onun çocuklarını bağlayın."
         />
       ) : (
         <FamilyMembersList
@@ -110,13 +117,14 @@ export default async function FamilyPage({
           familyName={family.name}
           people={people}
           relations={relations}
+          founderPersonId={family.founder_person_id}
         />
       )}
 
       <Surface className="mb-4">
         <h2 className="mb-1 text-[18px] font-semibold tracking-[-0.02em]">Kişi ekle</h2>
         <p className="mb-4 text-[13px] text-text-secondary">
-          İlk kişiyi buradan ekleyin. İlişkiler harita üzerinden bağlanır.
+          İlk kişi kurucu sayılır. Atlas’ta yalnızca kurucunun çocukları açılır.
         </p>
         <CreatePersonForm familyId={family.id} people={people} />
       </Surface>

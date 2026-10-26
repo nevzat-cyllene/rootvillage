@@ -1,7 +1,7 @@
 {
-  "name": "Dîwan",
-  "short_name": "Dîwan",
-  "description": "Yerlerin, ailelerin ve anlatıların ortak hafızası.",
+  "name": "Şop",
+  "short_name": "Şop",
+  "description": "Kürtlerin yaşayan hafıza atlası.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fafafa",

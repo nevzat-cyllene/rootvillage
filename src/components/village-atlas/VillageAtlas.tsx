@@ -443,11 +443,11 @@ export function VillageAtlas({
                         ? ` · ${grandchildBloom.people.length} çocuğu açıldı`
                         : " · tam ocak"
                     }`
-                  : `${childCount} çocuk ocağı bu aileden çıktı · tıklayınca büyür`}
+                  : `Kurucunun ${childCount} çocuğu · tıklayınca büyür`}
               </p>
             ) : (
               <p className="mt-2 rounded-[10px] bg-[#F3F4F6] px-2.5 py-2 text-[11px] font-medium text-text-tertiary">
-                Henüz çocuk kaydı yok
+                Kurucunun çocuk kaydı yok
               </p>
             )}
             {(selected.kinship_links?.length ?? 0) > 0 && (

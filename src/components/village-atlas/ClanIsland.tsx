@@ -186,6 +186,8 @@ export function ClanIsland({
 
     const opacityTarget = dimmed ? 0.35 : 1;
     for (const mat of materials.current) {
+      // Three.js materials are intentionally updated frame-by-frame for this visual transition.
+      // eslint-disable-next-line react-hooks/immutability
       mat.transparent = dimmed || mat.opacity < 0.99;
       mat.opacity += (opacityTarget - mat.opacity) * 0.12;
     }

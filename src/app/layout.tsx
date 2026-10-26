@@ -11,16 +11,16 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Dîwan",
-    template: "%s · Dîwan",
+    default: "Şop",
+    template: "%s · Şop",
   },
   description:
-    "Yerlerin, ailelerin ve anlatıların ortak hafızası.",
-  applicationName: "Dîwan",
+    "Kürtlerin yerlerini, ailelerini, anlatılarını ve kültürel mirasını ilişkilendiren yaşayan hafıza atlası.",
+  applicationName: "Şop",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Dîwan",
+    title: "Şop",
   },
   formatDetection: {
     telephone: false,

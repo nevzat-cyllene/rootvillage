@@ -17,7 +17,7 @@ export default async function ArchivePage({
   return (
     <div>
       <PageHeader
-        eyebrow="Dîwan · ortak bellek"
+        eyebrow="Şop · yaşayan hafıza atlası"
         title="Hafıza Arşivi"
         description="Yerleri, tarihsel olayları, anlatıları ve kültürel mirası birlikte kayda geçiriyoruz."
         actions={

@@ -58,7 +58,7 @@ export function InstallPrompt() {
       <div className="flex items-center gap-3 rounded-[16px] border border-white/80 bg-bg-surface/92 p-3 shadow-[0_14px_44px_rgba(0,0,0,0.14)] backdrop-blur-xl">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-text text-[15px] text-white" aria-hidden>↧</span>
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold tracking-[-0.02em]">Dîwan’ı yükle</p>
+          <p className="text-[13px] font-semibold tracking-[-0.02em]">Şop’u yükle</p>
           <p className="mt-0.5 line-clamp-1 text-[11px] leading-snug text-text-secondary">
             {isIos && !deferred
               ? "Safari’de Paylaş → Ana Ekrana Ekle ile telefonuna kur."

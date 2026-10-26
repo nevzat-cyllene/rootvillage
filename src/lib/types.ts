@@ -67,6 +67,8 @@ export type Family = {
   map_x?: number | null;
   map_z?: number | null;
   map_seed?: number | null;
+  /** Root person for generations + atlas bloom. */
+  founder_person_id?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

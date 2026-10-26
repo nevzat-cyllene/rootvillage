@@ -18,24 +18,32 @@ export function FamilyMembersList({
   familyName,
   people,
   relations,
+  founderPersonId = null,
 }: {
   familyId: string;
   familyName: string;
   people: Person[];
   relations: PersonRelation[];
+  founderPersonId?: string | null;
 }) {
   const rows = useMemo(() => {
     const memo = new Map<string, number>();
     return people
       .map((person) => {
-        const generation = resolvePersonGeneration(person.id, people, relations, memo);
+        const generation = resolvePersonGeneration(
+          person.id,
+          people,
+          relations,
+          memo,
+          founderPersonId,
+        );
         return { person, generation };
       })
       .sort((a, b) => {
         if (a.generation !== b.generation) return a.generation - b.generation;
         return a.person.full_name.localeCompare(b.person.full_name, "tr");
       });
-  }, [people, relations]);
+  }, [people, relations, founderPersonId]);
 
   const byGeneration = useMemo(() => {
     const groups = new Map<number, typeof rows>();
@@ -58,10 +66,17 @@ export function FamilyMembersList({
           </p>
           <h2 className="mt-1 text-[22px] font-semibold tracking-[-0.03em]">Aile üyeleri</h2>
           <p className="mt-1 max-w-xl text-[13px] text-text-secondary">
-            Nesiller kurucu kuşaktan türetilir. Kartlara tıklayarak kişiye veya kendi ailesine gidin.
+            Nesiller ailenin kurucusundan aşağı sayılır. Kartlara tıklayarak kişiye veya ailesine gidin.
           </p>
         </div>
-        <Badge>{people.length} kişi</Badge>
+        <div className="flex flex-wrap gap-2">
+          {founderPersonId && (
+            <Badge tone="accent">
+              Kurucu: {people.find((p) => p.id === founderPersonId)?.full_name ?? "atanmış"}
+            </Badge>
+          )}
+          <Badge>{people.length} kişi</Badge>
+        </div>
       </div>
 
       <div className="space-y-6">
@@ -112,6 +127,11 @@ export function FamilyMembersList({
                             <span className="rounded-full bg-bg-elevated px-2 py-0.5 text-[10px] font-semibold text-text-secondary">
                               {generationBadgeLabel(gen)}
                             </span>
+                            {person.id === founderPersonId && (
+                              <span className="rounded-full bg-[#EAF4F1] px-2 py-0.5 text-[10px] font-semibold text-[#286F61]">
+                                Kurucu
+                              </span>
+                            )}
                             {person.disputed && <Badge tone="warn">Tartışmalı</Badge>}
                           </div>
                           <p className="mt-0.5 text-[12px] text-text-secondary">

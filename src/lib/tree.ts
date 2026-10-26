@@ -69,10 +69,50 @@ export function linksForPerson(
   return { parents, children, spouses, siblings };
 }
 
-export function pickDefaultFocus(people: Person[]): string | null {
+export function pickDefaultFocus(
+  people: Person[],
+  founderPersonId?: string | null,
+): string | null {
   if (people.length === 0) return null;
-  // Prefer someone with both parents and children if possible, else first
+  if (founderPersonId && people.some((p) => p.id === founderPersonId)) {
+    return founderPersonId;
+  }
   return people[0]?.id ?? null;
+}
+
+/**
+ * Generation depth from the family founder downward.
+ * Founder = 1. Ancestors above the founder are not in this numbering
+ * (return 0 so UI can band them as "üst soy").
+ */
+export function generationFromFounder(
+  personId: string,
+  founderId: string | null | undefined,
+  relations: PersonRelation[],
+  memo = new Map<string, number>(),
+): number {
+  if (!founderId) return 1;
+
+  // One BFS from founder fills the memo for the whole family.
+  if (!memo.has(founderId)) {
+    memo.set(founderId, 1);
+    const queue: string[] = [founderId];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const depth = memo.get(current) ?? 1;
+      for (const relation of relations) {
+        if (relation.relation_type !== "parent") continue;
+        if (relation.related_person_id !== current) continue;
+        const childId = relation.person_id;
+        if (memo.has(childId)) continue;
+        memo.set(childId, depth + 1);
+        queue.push(childId);
+      }
+    }
+  }
+
+  if (personId === founderId) return 1;
+  return memo.get(personId) ?? 0;
 }
 
 /** True when adding child -> parent would make someone their own ancestor. */
@@ -203,51 +243,30 @@ export function extendedLinksForPerson(
   });
 }
 
-/** Generation number within a family (1 = founding / no in-family parents). */
+/**
+ * Generation relative to family founder.
+ * Manual people.generation overrides when set.
+ * 0 = above founder (üst soy); 1 = founder; 2+ = descendants.
+ */
 export function resolvePersonGeneration(
   personId: string,
   people: Person[],
   relations: PersonRelation[],
   memo = new Map<string, number>(),
-  path = new Set<string>(),
+  founderPersonId?: string | null,
 ): number {
-  const cached = memo.get(personId);
-  if (cached != null) return cached;
-  if (path.has(personId)) return 1;
-
   const person = people.find((p) => p.id === personId);
   if (!person) return 1;
   if (person.generation != null && person.generation >= 1) {
     memo.set(personId, person.generation);
     return person.generation;
   }
-
-  const nextPath = new Set(path).add(personId);
-  const inFamilyParents = relations
-    .filter(
-      (r) =>
-        r.relation_type === "parent" &&
-        r.person_id === personId &&
-        people.some((p) => p.id === r.related_person_id && p.family_id === person.family_id),
-    )
-    .map((r) => r.related_person_id);
-
-  const generation =
-    inFamilyParents.length === 0
-      ? 1
-      : 1 +
-        Math.max(
-          ...inFamilyParents.map((parentId) =>
-            resolvePersonGeneration(parentId, people, relations, memo, nextPath),
-          ),
-        );
-
-  memo.set(personId, generation);
-  return generation;
+  return generationFromFounder(personId, founderPersonId, relations, memo);
 }
 
 /** Short kinship label relative to founding generation (1). */
 export function generationKinLabel(generation: number): string {
+  if (generation === 0) return "Üst soy · kurucu üstü";
   if (generation <= 1) return "1. nesil · kurucu";
   if (generation === 2) return "Çocuk · 2. nesil";
   if (generation === 3) return "Torun · 3. nesil";
@@ -257,7 +276,8 @@ export function generationKinLabel(generation: number): string {
 }
 
 export function generationBadgeLabel(generation: number): string {
-  if (generation <= 1) return "1. nesil";
+  if (generation === 0) return "Üst soy";
+  if (generation <= 1) return "Kurucu";
   if (generation === 2) return "Çocuk";
   if (generation === 3) return "Torun";
   if (generation === 4) return "Torun çocuğu";

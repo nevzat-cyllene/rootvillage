@@ -112,7 +112,15 @@ export function CreatePersonForm({
       });
     }
 
-    await supabase.from("families").update({ is_incomplete: false }).eq("id", familyId);
+    // First person in the family becomes the founder (atlas + generations root).
+    if (people.length === 0) {
+      await supabase
+        .from("families")
+        .update({ founder_person_id: created.id, is_incomplete: false })
+        .eq("id", familyId);
+    } else {
+      await supabase.from("families").update({ is_incomplete: false }).eq("id", familyId);
+    }
 
     clearAuthDraft(draftKey);
     setBusy(false);

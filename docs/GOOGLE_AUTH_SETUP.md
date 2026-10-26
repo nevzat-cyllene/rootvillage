@@ -1,4 +1,4 @@
-# Google ile giriş — RootVillage
+# Google ile giriş — Şop
 
 Site: **https://rootvillage.vercel.app**  
 Supabase: `chfyoorjulkwyplyunco`
@@ -25,9 +25,9 @@ Burayı doldurmazsan Google “Sign in to chfyoorjulkwyplyunco.supabase.co” g�
 
 | Alan | Değer |
 |------|--------|
-| App name | `RootVillage` |
+| App name | `Şop` |
 | User support email | senin mailin |
-| App logo | RootVillage ikonu (kare, net) |
+| App logo | Şop ikonu (kare, net) |
 | Application home page | `https://rootvillage.vercel.app` |
 | Privacy / Terms | varsa ekle; yoksa şimdilik home page |
 | Authorized domains | `rootvillage.vercel.app` + `supabase.co` |
@@ -43,7 +43,7 @@ https://rootvillage.vercel.app
 ```
 
 `cyllene-fitness.vercel.app` yazıyorsa Google sonrası oraya düşersin.  
-CylleneFitness ile **aynı** Google OAuth client’ı paylaşma — RootVillage için ayrı client aç, App name: `RootVillage`.
+CylleneFitness ile **aynı** Google OAuth client’ı paylaşma — Şop için ayrı client aç, App name: `Şop`.
 
 **Redirect URLs:**
 ```

@@ -91,11 +91,13 @@ export function PersonRelationStudio({
   people,
   homePeople = people,
   relations,
+  founderPersonId = null,
 }: {
   familyId: string;
   people: Person[];
   homePeople?: Person[];
   relations: PersonRelation[];
+  founderPersonId?: string | null;
 }) {
   const router = useRouter();
   const { requireAuth } = useAuth();
@@ -114,9 +116,11 @@ export function PersonRelationStudio({
 
   useEffect(() => {
     if (!focusId || !people.some((p) => p.id === focusId)) {
-      setFocusId(pickDefaultFocus(homePeople.length > 0 ? homePeople : people));
+      setFocusId(
+        pickDefaultFocus(homePeople.length > 0 ? homePeople : people, founderPersonId),
+      );
     }
-  }, [people, homePeople, focusId]);
+  }, [people, homePeople, focusId, founderPersonId]);
 
   useEffect(() => {
     if (!fullscreen) return;
@@ -447,10 +451,13 @@ export function PersonRelationStudio({
       }
     }
 
-    await supabase
-      .from("families")
-      .update({ is_incomplete: false })
-      .eq("id", familyId);
+    const familyPatch: { is_incomplete: boolean; founder_person_id?: string } = {
+      is_incomplete: false,
+    };
+    if (!founderPersonId && homePeople.length === 0) {
+      familyPatch.founder_person_id = created.id;
+    }
+    await supabase.from("families").update(familyPatch).eq("id", familyId);
 
     setBusy(false);
     setDraft(emptyDraft());
@@ -501,7 +508,7 @@ export function PersonRelationStudio({
       <div className="mb-8 rounded-[18px] border border-dashed border-border bg-bg-surface/70 px-5 py-10 text-center">
         <p className="text-[16px] font-semibold tracking-[-0.02em]">İlişki haritası boş</p>
         <p className="mx-auto mt-2 max-w-md text-[13px] text-text-secondary">
-          İlk kişiyi ekledikten sonra ebeveyn, eş ve çocuk bağlarını buradan kurarsınız.
+          İlk eklenen kişi kurucu olur. Sonra onun çocuklarını ve eşini buradan bağlayın.
         </p>
       </div>
     );
@@ -544,6 +551,7 @@ export function PersonRelationStudio({
                 {people.map((person) => (
                   <option key={person.id} value={person.id}>
                     {person.full_name}
+                    {person.id === founderPersonId ? " · kurucu" : ""}
                     {person.family_id !== familyId ? " · başka aile" : ""}
                   </option>
                 ))}
@@ -596,6 +604,7 @@ export function PersonRelationStudio({
                 person={focus}
                 variant="focus"
                 pulse={pulse}
+                isFounder={focus.id === founderPersonId}
                 onEdit={openEdit}
                 onConnections={openConnections}
                 detailHref={`/person/${focus.id}`}
@@ -736,6 +745,7 @@ function HeroPersonCard({
   person,
   variant,
   pulse,
+  isFounder = false,
   onEdit,
   onConnections,
   onSelect,
@@ -744,6 +754,7 @@ function HeroPersonCard({
   person: Person;
   variant: "focus" | "partner";
   pulse?: boolean;
+  isFounder?: boolean;
   onEdit?: () => void;
   onConnections?: () => void;
   onSelect?: () => void;
@@ -771,6 +782,16 @@ function HeroPersonCard({
       <p className={cn("mt-1 text-[11px]", isFocus ? "text-white/65" : "text-text-secondary")}>
         {formatYearRange(person.birth_year, person.death_year)}
       </p>
+      {isFounder && (
+        <span
+          className={cn(
+            "mt-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            isFocus ? "bg-white/18 text-white" : "bg-[#EAF4F1] text-[#286F61]",
+          )}
+        >
+          Kurucu
+        </span>
+      )}
       {person.gender && (
         <span className={cn(
           "mt-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold",
@@ -901,10 +922,10 @@ function ConnectionSheet({
   });
   const extended = extendedLinksForPerson(focus.id, people, relations);
   const roleHelp: Record<AddRole, string> = {
-    parent: "Seçilen kişi odak kişinin ebeveyni olur.",
-    child: "Seçilen kişi odak kişinin çocuğu olur.",
-    sibling: "Seçilen kişi odak kişinin bilinen ebeveynleriyle bağlanır.",
-    spouse: "Seçilen kişi odak kişinin eşi olarak bağlanır.",
+    parent: `${focus.full_name}’in ebeveyni (üst nesil) olarak bağlanır.`,
+    child: `${focus.full_name}’in çocuğu (alt nesil) olarak bağlanır.`,
+    sibling: `${focus.full_name} ile aynı ebeveynlere bağlanır (kardeş).`,
+    spouse: `${focus.full_name}’in eşi olur.`,
   };
 
   useEffect(() => {
