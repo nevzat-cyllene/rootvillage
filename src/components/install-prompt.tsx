@@ -43,23 +43,6 @@ function detectIos(): boolean {
   );
 }
 
-/** Phone / tablet / desktop-site / installable — unlock CSS that hides pure desktop. */
-function shouldShowInstallSurface(hasBip: boolean): boolean {
-  if (typeof window === "undefined") return true;
-  if (isForcedInstall() || hasBip) return true;
-  const ua = window.navigator.userAgent;
-  if (/Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
-    return true;
-  }
-  if ((window.navigator.maxTouchPoints ?? 0) > 0) return true;
-  if (window.matchMedia("(pointer: coarse)").matches) return true;
-  if (window.matchMedia("(hover: none)").matches) return true;
-  if (window.matchMedia("(max-width: 900px)").matches || window.innerWidth <= 900) {
-    return true;
-  }
-  return false;
-}
-
 function markShowInstall(on: boolean) {
   if (on) document.documentElement.setAttribute("data-show-install", "");
   else document.documentElement.removeAttribute("data-show-install");
