@@ -23,7 +23,7 @@ const memoryPaths = [
   {
     number: "03",
     label: "Söz ve edebiyat",
-    detail: "Dengbêjler, kilamlar, destanlar, masallar, şiirler ve yazılı eserler.",
+    detail: "Dengbêjler, klamlar, destanlar, masallar, şiirler ve yazılı eserler.",
     href: "/archive#yeni",
   },
   {
@@ -77,11 +77,11 @@ export default async function HomePage() {
               Kürtlerin yaşayan hafıza atlası
             </p>
             <h1 className="max-w-3xl text-[42px] font-semibold leading-[0.99] tracking-[-0.055em] text-text sm:text-[62px] lg:text-[68px]">
-              Geçmiş kaybolmaz.
-              <span className="mt-1 block text-[#53685f]">Bağlamından kopar.</span>
+              Geçmiş kaybolmadı.
+              <span className="mt-1 block text-[#53685f]">Dağılan izleri birlikte toplayalım.</span>
             </h1>
             <p className="mt-6 max-w-2xl text-[16px] leading-[1.75] text-text-secondary sm:text-[18px]">
-              Şop; bir yer adını ait olduğu coğrafyaya, bir aileyi uzandığı kollara, bir kilamı
+              Şop; bir yer adını ait olduğu coğrafyaya, bir aileyi uzandığı kollara, bir klamı
               onu taşıyan sese ve bir tarihsel olayı tanıklıklarına yeniden bağlayan ortak dijital
               hafıza alanıdır.
             </p>
