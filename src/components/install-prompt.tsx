@@ -52,7 +52,7 @@ function dbgLog(
   // #region agent log
   const payload = JSON.stringify({
     sessionId: "ffc48a",
-    runId: "banner-force-1",
+    runId: "banner-clean-1",
     hypothesisId,
     location,
     message,
@@ -74,7 +74,7 @@ function dbgLog(
 
 export function InstallPrompt() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [mode, setMode] = useState<"install" | "standalone" | "hidden">("install");
+  const [visible, setVisible] = useState(false);
   const [isIos, setIsIos] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
@@ -89,40 +89,33 @@ export function InstallPrompt() {
     if (ios) setShowInstallHelp(true);
 
     document.documentElement.toggleAttribute("data-force-install", forced);
-    document.documentElement.removeAttribute("data-standalone");
     document.documentElement.setAttribute("data-show-install", "");
 
-    dbgLog("H3_H6", "install-prompt.tsx:mount", "banner mode decide", {
+    dbgLog("H3", "install-prompt.tsx:mount", "install banner gate", {
       standalone,
       forced,
       hasBip: Boolean(window.__sopInstallPrompt),
       displayMode: window.matchMedia("(display-mode: standalone)").matches
         ? "standalone"
-        : window.matchMedia("(display-mode: minimal-ui)").matches
-          ? "minimal-ui"
-          : window.matchMedia("(display-mode: fullscreen)").matches
-            ? "fullscreen"
-            : "browser",
+        : "browser",
       // @ts-expect-error iOS
       iosStandalone: window.navigator.standalone === true,
-      ua: window.navigator.userAgent.slice(0, 160),
-      innerWidth: window.innerWidth,
       path: window.location.href,
+      ua: window.navigator.userAgent.slice(0, 120),
     });
 
+    // Already installed PWA → no banner (orange diagnostic removed).
     if (standalone) {
-      setMode("standalone");
-      document.documentElement.style.setProperty("--install-banner-h", "58px");
+      setVisible(false);
       return;
     }
 
-    setMode("install");
+    setVisible(true);
 
     const acceptPrompt = (prompt: BeforeInstallPromptEvent) => {
       setDeferred(prompt);
-      setMode("install");
+      setVisible(true);
       setShowInstallHelp(false);
-      dbgLog("H5", "install-prompt.tsx:bip", "BIP accepted", {});
     };
     const onBip = (e: Event) => {
       e.preventDefault();
@@ -132,7 +125,7 @@ export function InstallPrompt() {
     const onEarlyPrompt = () => {
       if (window.__sopInstallPrompt) acceptPrompt(window.__sopInstallPrompt);
     };
-    const onInstalled = () => setMode("hidden");
+    const onInstalled = () => setVisible(false);
 
     window.addEventListener("beforeinstallprompt", onBip);
     window.addEventListener("sop:install-ready", onEarlyPrompt);
@@ -143,19 +136,6 @@ export function InstallPrompt() {
       void navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
 
-    requestAnimationFrame(() => {
-      const el = document.querySelector(".install-prompt");
-      const style = el ? window.getComputedStyle(el) : null;
-      dbgLog("H1_H6", "install-prompt.tsx:paint", "forced banner paint", {
-        hasEl: Boolean(el),
-        display: style?.display ?? null,
-        visibility: style?.visibility ?? null,
-        opacity: style?.opacity ?? null,
-        zIndex: style?.zIndex ?? null,
-        rect: el ? el.getBoundingClientRect().toJSON() : null,
-      });
-    });
-
     return () => {
       window.removeEventListener("beforeinstallprompt", onBip);
       window.removeEventListener("sop:install-ready", onEarlyPrompt);
@@ -164,7 +144,7 @@ export function InstallPrompt() {
   }, []);
 
   useEffect(() => {
-    if (mode === "hidden") {
+    if (!visible) {
       document.documentElement.style.removeProperty("--install-banner-h");
       return;
     }
@@ -172,9 +152,9 @@ export function InstallPrompt() {
     return () => {
       document.documentElement.style.removeProperty("--install-banner-h");
     };
-  }, [mode]);
+  }, [visible]);
 
-  if (mode === "hidden") return null;
+  if (!visible) return null;
 
   async function onInstall() {
     if (!deferred) {
@@ -185,7 +165,7 @@ export function InstallPrompt() {
     try {
       await deferred.prompt();
       const choice = await deferred.userChoice;
-      if (choice.outcome === "accepted") setMode("hidden");
+      if (choice.outcome === "accepted") setVisible(false);
     } finally {
       setInstalling(false);
       setDeferred(null);
@@ -193,11 +173,8 @@ export function InstallPrompt() {
     }
   }
 
-  const isStandaloneMode = mode === "standalone";
-
   return (
     <>
-      {/* Beat any stale cached CSS that used display:none !important */}
       <style
         dangerouslySetInnerHTML={{
           __html:
@@ -206,12 +183,10 @@ export function InstallPrompt() {
       />
       <div
         role="dialog"
-        aria-label={isStandaloneMode ? "Kurulu uygulama" : "Uygulamayı yükle"}
+        aria-label="Uygulamayı yükle"
         className={cn(
           "install-prompt",
-          isStandaloneMode
-            ? "border-b border-amber-200/40 bg-[linear-gradient(105deg,#5C3B0A_0%,#8A5A12_50%,#5C3B0A_100%)]"
-            : "border-b border-white/40 bg-[linear-gradient(105deg,#0F2A24_0%,#1A4A3E_42%,#243B55_100%)]",
+          "border-b border-white/40 bg-[linear-gradient(105deg,#0F2A24_0%,#1A4A3E_42%,#243B55_100%)]",
           "pt-[env(safe-area-inset-top)] shadow-[0_12px_40px_rgba(15,42,36,0.28)]",
         )}
       >
@@ -220,45 +195,39 @@ export function InstallPrompt() {
             className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-white/12 text-[18px] text-white ring-1 ring-white/20"
             aria-hidden
           >
-            {isStandaloneMode ? "✓" : "↓"}
+            ↓
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-semibold tracking-[-0.02em] text-white sm:text-[14px]">
-              {isStandaloneMode
-                ? "Şu an kurulu Şop uygulamasındasın"
-                : "Şop’u telefonuna indirmek ister misin?"}
+              Şop’u telefonuna indirmek ister misin?
             </p>
-            <p className="mt-0.5 line-clamp-4 text-[11px] leading-snug text-white/70 sm:line-clamp-2">
-              {isStandaloneMode
-                ? "İndirme bandı burada çıkmaz. Ana ekran ikonunu kapat → Chrome/Safari yeni sekme (gizli sekme daha iyi) → rootvillage.vercel.app yaz."
-                : isIos && !deferred
-                  ? "Safari’de Paylaş → Ana Ekrana Ekle ile ana ekranına kur."
-                  : deferred
-                    ? "Tek dokunuşla ana ekrana ekle; köy hafızası cebinde."
-                    : "Yükle’ye bas → tarayıcı menüsünden Ana ekrana ekle."}
+            <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-white/70 sm:line-clamp-1">
+              {isIos && !deferred
+                ? "Safari’de Paylaş → Ana Ekrana Ekle ile ana ekranına kur."
+                : deferred
+                  ? "Tek dokunuşla ana ekrana ekle; köy hafızası cebinde."
+                  : "Yükle’ye bas → tarayıcı menüsünden Ana ekrana ekle."}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            {!isStandaloneMode && (
-              <Button
-                className="!border-0 !bg-white !px-3.5 !py-2 !text-[12px] !text-[#16352E] shadow-sm hover:!bg-white/90"
-                disabled={installing}
-                onClick={() => void onInstall()}
-              >
-                {installing ? "…" : deferred ? "İndir" : "Yükle"}
-              </Button>
-            )}
+            <Button
+              className="!border-0 !bg-white !px-3.5 !py-2 !text-[12px] !text-[#16352E] shadow-sm hover:!bg-white/90"
+              disabled={installing}
+              onClick={() => void onInstall()}
+            >
+              {installing ? "…" : deferred ? "İndir" : "Yükle"}
+            </Button>
             <button
               type="button"
               className="grid h-9 w-9 place-items-center rounded-full text-[18px] text-white/75 transition hover:bg-white/10 hover:text-white"
               aria-label="Kapat"
-              onClick={() => setMode("hidden")}
+              onClick={() => setVisible(false)}
             >
               ×
             </button>
           </div>
         </div>
-        {!isStandaloneMode && (showInstallHelp || isForcedInstall()) && !deferred && (
+        {(showInstallHelp || isForcedInstall()) && !deferred && (
           <div className="border-t border-white/15 bg-black/10 px-4 py-2.5 text-center text-[11px] font-medium leading-relaxed text-white/90">
             {isIos ? (
               <>
