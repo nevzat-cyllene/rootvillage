@@ -228,9 +228,9 @@ export function InstallPrompt() {
                 ? "Şu an kurulu Şop uygulamasındasın"
                 : "Şop’u telefonuna indirmek ister misin?"}
             </p>
-            <p className="mt-0.5 line-clamp-3 text-[11px] leading-snug text-white/70 sm:line-clamp-2">
+            <p className="mt-0.5 line-clamp-4 text-[11px] leading-snug text-white/70 sm:line-clamp-2">
               {isStandaloneMode
-                ? "İndirme bandı yalnızca Chrome/Safari sekmesinde çıkar. Ana ekran ikonunu değil, tarayıcıda rootvillage.vercel.app aç."
+                ? "İndirme bandı burada çıkmaz. Ana ekran ikonunu kapat → Chrome/Safari yeni sekme (gizli sekme daha iyi) → rootvillage.vercel.app yaz."
                 : isIos && !deferred
                   ? "Safari’de Paylaş → Ana Ekrana Ekle ile ana ekranına kur."
                   : deferred
