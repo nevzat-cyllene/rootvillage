@@ -43,11 +43,6 @@ function detectIos(): boolean {
   );
 }
 
-function markShowInstall(on: boolean) {
-  if (on) document.documentElement.setAttribute("data-show-install", "");
-  else document.documentElement.removeAttribute("data-show-install");
-}
-
 function dbgLog(
   hypothesisId: string,
   location: string,
@@ -57,7 +52,7 @@ function dbgLog(
   // #region agent log
   const payload = JSON.stringify({
     sessionId: "ffc48a",
-    runId: "auto-banner-1",
+    runId: "banner-force-1",
     hypothesisId,
     location,
     message,
@@ -79,7 +74,7 @@ function dbgLog(
 
 export function InstallPrompt() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [visible, setVisible] = useState(true);
+  const [mode, setMode] = useState<"install" | "standalone" | "hidden">("install");
   const [isIos, setIsIos] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
@@ -90,54 +85,44 @@ export function InstallPrompt() {
     const standalone = isStandalone();
     const forced = isForcedInstall();
     const ios = detectIos();
-    const hasBip = Boolean(window.__sopInstallPrompt);
-    // Always unlock banner in browser tabs (standalone still hides).
-    const showSurface = !standalone;
     setIsIos(ios);
     if (ios) setShowInstallHelp(true);
 
     document.documentElement.toggleAttribute("data-force-install", forced);
-    markShowInstall(showSurface);
+    document.documentElement.removeAttribute("data-standalone");
+    document.documentElement.setAttribute("data-show-install", "");
 
-    const cssWouldHideDesktop =
-      window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 901px)")
-        .matches &&
-      !forced &&
-      !showSurface;
-
-    dbgLog("H1_H2_H5", "install-prompt.tsx:mount", "auto banner gate", {
+    dbgLog("H3_H6", "install-prompt.tsx:mount", "banner mode decide", {
       standalone,
       forced,
-      showSurface,
-      hasBip,
-      cssWouldHideDesktop,
-      displayModeStandalone: window.matchMedia("(display-mode: standalone)").matches,
+      hasBip: Boolean(window.__sopInstallPrompt),
+      displayMode: window.matchMedia("(display-mode: standalone)").matches
+        ? "standalone"
+        : window.matchMedia("(display-mode: minimal-ui)").matches
+          ? "minimal-ui"
+          : window.matchMedia("(display-mode: fullscreen)").matches
+            ? "fullscreen"
+            : "browser",
       // @ts-expect-error iOS
       iosStandalone: window.navigator.standalone === true,
-      ua: window.navigator.userAgent.slice(0, 140),
+      ua: window.navigator.userAgent.slice(0, 160),
       innerWidth: window.innerWidth,
-      maxTouchPoints: window.navigator.maxTouchPoints,
-      coarse: window.matchMedia("(pointer: coarse)").matches,
-      fine: window.matchMedia("(pointer: fine)").matches,
-      hover: window.matchMedia("(hover: hover)").matches,
-      path: window.location.pathname + window.location.search,
+      path: window.location.href,
     });
 
     if (standalone) {
-      document.documentElement.setAttribute("data-standalone", "1");
-      setVisible(false);
-      dbgLog("H3", "install-prompt.tsx:standalone", "hidden standalone", {});
+      setMode("standalone");
+      document.documentElement.style.setProperty("--install-banner-h", "58px");
       return;
     }
-    document.documentElement.removeAttribute("data-standalone");
-    setVisible(true);
+
+    setMode("install");
 
     const acceptPrompt = (prompt: BeforeInstallPromptEvent) => {
       setDeferred(prompt);
-      markShowInstall(true);
-      setVisible(true);
+      setMode("install");
       setShowInstallHelp(false);
-      dbgLog("H5", "install-prompt.tsx:bip", "BIP accepted → show banner", {});
+      dbgLog("H5", "install-prompt.tsx:bip", "BIP accepted", {});
     };
     const onBip = (e: Event) => {
       e.preventDefault();
@@ -147,7 +132,7 @@ export function InstallPrompt() {
     const onEarlyPrompt = () => {
       if (window.__sopInstallPrompt) acceptPrompt(window.__sopInstallPrompt);
     };
-    const onInstalled = () => setVisible(false);
+    const onInstalled = () => setMode("hidden");
 
     window.addEventListener("beforeinstallprompt", onBip);
     window.addEventListener("sop:install-ready", onEarlyPrompt);
@@ -158,16 +143,16 @@ export function InstallPrompt() {
       void navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
 
-    // After paint: confirm computed visibility (H1 CSS hide)
     requestAnimationFrame(() => {
       const el = document.querySelector(".install-prompt");
       const style = el ? window.getComputedStyle(el) : null;
-      dbgLog("H1", "install-prompt.tsx:paint", "computed banner style", {
+      dbgLog("H1_H6", "install-prompt.tsx:paint", "forced banner paint", {
         hasEl: Boolean(el),
         display: style?.display ?? null,
         visibility: style?.visibility ?? null,
-        showAttr: document.documentElement.hasAttribute("data-show-install"),
-        forceAttr: document.documentElement.hasAttribute("data-force-install"),
+        opacity: style?.opacity ?? null,
+        zIndex: style?.zIndex ?? null,
+        rect: el ? el.getBoundingClientRect().toJSON() : null,
       });
     });
 
@@ -179,7 +164,7 @@ export function InstallPrompt() {
   }, []);
 
   useEffect(() => {
-    if (!visible) {
+    if (mode === "hidden") {
       document.documentElement.style.removeProperty("--install-banner-h");
       return;
     }
@@ -187,9 +172,9 @@ export function InstallPrompt() {
     return () => {
       document.documentElement.style.removeProperty("--install-banner-h");
     };
-  }, [visible]);
+  }, [mode]);
 
-  if (!visible) return null;
+  if (mode === "hidden") return null;
 
   async function onInstall() {
     if (!deferred) {
@@ -200,7 +185,7 @@ export function InstallPrompt() {
     try {
       await deferred.prompt();
       const choice = await deferred.userChoice;
-      if (choice.outcome === "accepted") setVisible(false);
+      if (choice.outcome === "accepted") setMode("hidden");
     } finally {
       setInstalling(false);
       setDeferred(null);
@@ -208,69 +193,88 @@ export function InstallPrompt() {
     }
   }
 
+  const isStandaloneMode = mode === "standalone";
+
   return (
-    <div
-      role="dialog"
-      aria-label="Uygulamayı yükle"
-      className={cn(
-        "install-prompt fixed inset-x-0 top-0 z-[80]",
-        "border-b border-white/40 bg-[linear-gradient(105deg,#0F2A24_0%,#1A4A3E_42%,#243B55_100%)]",
-        "pt-[env(safe-area-inset-top)] shadow-[0_12px_40px_rgba(15,42,36,0.28)]",
-      )}
-    >
-      <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-2.5 sm:px-6">
-        <span
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-white/12 text-[18px] text-white ring-1 ring-white/20"
-          aria-hidden
-        >
-          ↓
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold tracking-[-0.02em] text-white sm:text-[14px]">
-            Şop’u telefonuna indirmek ister misin?
-          </p>
-          <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-white/70 sm:line-clamp-1">
-            {isIos && !deferred
-              ? "Safari’de Paylaş → Ana Ekrana Ekle ile ana ekranına kur."
-              : deferred
-                ? "Tek dokunuşla ana ekrana ekle; köy hafızası cebinde."
-                : "Yükle’ye bas → tarayıcı menüsünden Ana ekrana ekle."}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Button
-            className="!border-0 !bg-white !px-3.5 !py-2 !text-[12px] !text-[#16352E] shadow-sm hover:!bg-white/90"
-            disabled={installing}
-            onClick={() => void onInstall()}
+    <>
+      {/* Beat any stale cached CSS that used display:none !important */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html:
+            ".install-prompt{display:block!important;visibility:visible!important;opacity:1!important;position:fixed!important;inset-inline:0!important;top:0!important;z-index:99999!important;}",
+        }}
+      />
+      <div
+        role="dialog"
+        aria-label={isStandaloneMode ? "Kurulu uygulama" : "Uygulamayı yükle"}
+        className={cn(
+          "install-prompt",
+          isStandaloneMode
+            ? "border-b border-amber-200/40 bg-[linear-gradient(105deg,#5C3B0A_0%,#8A5A12_50%,#5C3B0A_100%)]"
+            : "border-b border-white/40 bg-[linear-gradient(105deg,#0F2A24_0%,#1A4A3E_42%,#243B55_100%)]",
+          "pt-[env(safe-area-inset-top)] shadow-[0_12px_40px_rgba(15,42,36,0.28)]",
+        )}
+      >
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-3 py-2.5 sm:px-6">
+          <span
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-white/12 text-[18px] text-white ring-1 ring-white/20"
+            aria-hidden
           >
-            {installing ? "…" : deferred ? "İndir" : "Yükle"}
-          </Button>
-          <button
-            type="button"
-            className="grid h-9 w-9 place-items-center rounded-full text-[18px] text-white/75 transition hover:bg-white/10 hover:text-white"
-            aria-label="Kapat"
-            onClick={() => setVisible(false)}
-          >
-            ×
-          </button>
+            {isStandaloneMode ? "✓" : "↓"}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold tracking-[-0.02em] text-white sm:text-[14px]">
+              {isStandaloneMode
+                ? "Şu an kurulu Şop uygulamasındasın"
+                : "Şop’u telefonuna indirmek ister misin?"}
+            </p>
+            <p className="mt-0.5 line-clamp-3 text-[11px] leading-snug text-white/70 sm:line-clamp-2">
+              {isStandaloneMode
+                ? "İndirme bandı yalnızca Chrome/Safari sekmesinde çıkar. Ana ekran ikonunu değil, tarayıcıda rootvillage.vercel.app aç."
+                : isIos && !deferred
+                  ? "Safari’de Paylaş → Ana Ekrana Ekle ile ana ekranına kur."
+                  : deferred
+                    ? "Tek dokunuşla ana ekrana ekle; köy hafızası cebinde."
+                    : "Yükle’ye bas → tarayıcı menüsünden Ana ekrana ekle."}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {!isStandaloneMode && (
+              <Button
+                className="!border-0 !bg-white !px-3.5 !py-2 !text-[12px] !text-[#16352E] shadow-sm hover:!bg-white/90"
+                disabled={installing}
+                onClick={() => void onInstall()}
+              >
+                {installing ? "…" : deferred ? "İndir" : "Yükle"}
+              </Button>
+            )}
+            <button
+              type="button"
+              className="grid h-9 w-9 place-items-center rounded-full text-[18px] text-white/75 transition hover:bg-white/10 hover:text-white"
+              aria-label="Kapat"
+              onClick={() => setMode("hidden")}
+            >
+              ×
+            </button>
+          </div>
         </div>
+        {!isStandaloneMode && (showInstallHelp || isForcedInstall()) && !deferred && (
+          <div className="border-t border-white/15 bg-black/10 px-4 py-2.5 text-center text-[11px] font-medium leading-relaxed text-white/90">
+            {isIos ? (
+              <>
+                1) Alttaki <strong>Paylaş</strong> simgesine dokun
+                <br />
+                2) <strong>Ana Ekrana Ekle</strong> → Ekle
+              </>
+            ) : (
+              <>
+                Chrome: sağ üst <strong>⋮</strong> → <strong>Uygulamayı yükle</strong> veya{" "}
+                <strong>Ana ekrana ekle</strong>
+              </>
+            )}
+          </div>
+        )}
       </div>
-      {(showInstallHelp || isForcedInstall()) && !deferred && (
-        <div className="border-t border-white/15 bg-black/10 px-4 py-2.5 text-center text-[11px] font-medium leading-relaxed text-white/90">
-          {isIos ? (
-            <>
-              1) Alttaki <strong>Paylaş</strong> simgesine dokun
-              <br />
-              2) <strong>Ana Ekrana Ekle</strong> → Ekle
-            </>
-          ) : (
-            <>
-              Chrome: sağ üst <strong>⋮</strong> → <strong>Uygulamayı yükle</strong> veya{" "}
-              <strong>Ana ekrana ekle</strong>
-            </>
-          )}
-        </div>
-      )}
-    </div>
+    </>
   );
 }

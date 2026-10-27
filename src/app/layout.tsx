@@ -59,7 +59,7 @@ export default async function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var d=document.documentElement;var s=window.matchMedia('(display-mode: standalone)').matches||!!window.navigator.standalone;if(s)d.setAttribute('data-standalone','1');else d.setAttribute('data-show-install','');if(new URLSearchParams(location.search).get('install')==='1')d.setAttribute('data-force-install','');}catch(e){}window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__sopInstallPrompt=e;document.documentElement.setAttribute('data-show-install','');window.dispatchEvent(new Event('sop:install-ready'));});if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){});}})();",
+              "(function(){try{var d=document.documentElement;d.setAttribute('data-show-install','');if(new URLSearchParams(location.search).get('install')==='1')d.setAttribute('data-force-install','');d.removeAttribute('data-standalone');}catch(e){}window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__sopInstallPrompt=e;window.dispatchEvent(new Event('sop:install-ready'));});if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').then(function(r){r.update&&r.update();}).catch(function(){});}})();",
           }}
         />
       </head>
