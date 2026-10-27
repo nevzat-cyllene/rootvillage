@@ -112,15 +112,34 @@ export function PersonRelationStudio({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pulse, setPulse] = useState(false);
-  const [fullscreen, setFullscreen] = useState(true);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [livePeople, setLivePeople] = useState(people);
+  const [liveHomePeople, setLiveHomePeople] = useState(homePeople);
+  const [liveRelations, setLiveRelations] = useState(relations);
+  const [freshIds, setFreshIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
-    if (!focusId || !people.some((p) => p.id === focusId)) {
+    setLivePeople(people);
+  }, [people]);
+
+  useEffect(() => {
+    setLiveHomePeople(homePeople);
+  }, [homePeople]);
+
+  useEffect(() => {
+    setLiveRelations(relations);
+  }, [relations]);
+
+  useEffect(() => {
+    if (!focusId || !livePeople.some((p) => p.id === focusId)) {
       setFocusId(
-        pickDefaultFocus(homePeople.length > 0 ? homePeople : people, founderPersonId),
+        pickDefaultFocus(
+          liveHomePeople.length > 0 ? liveHomePeople : livePeople,
+          founderPersonId,
+        ),
       );
     }
-  }, [people, homePeople, focusId, founderPersonId]);
+  }, [livePeople, liveHomePeople, focusId, founderPersonId]);
 
   useEffect(() => {
     if (!fullscreen) return;
@@ -140,18 +159,18 @@ export function PersonRelationStudio({
     };
   }, [fullscreen, addRole, editOpen, connectionsOpen]);
 
-  const focus = people.find((p) => p.id === focusId) ?? null;
+  const focus = livePeople.find((p) => p.id === focusId) ?? null;
   const links = useMemo(
-    () => (focusId ? linksForPerson(focusId, people, relations) : null),
-    [focusId, people, relations],
+    () => (focusId ? linksForPerson(focusId, livePeople, liveRelations) : null),
+    [focusId, livePeople, liveRelations],
   );
   const primarySpouseId = links?.spouses[0]?.id ?? null;
   const spouseLinks = useMemo(
     () =>
       primarySpouseId
-        ? linksForPerson(primarySpouseId, people, relations)
+        ? linksForPerson(primarySpouseId, livePeople, liveRelations)
         : null,
-    [primarySpouseId, people, relations],
+    [primarySpouseId, livePeople, liveRelations],
   );
 
   useEffect(() => {
@@ -222,7 +241,7 @@ export function PersonRelationStudio({
     }> = [];
 
     if (connectionRole === "parent") {
-      if (wouldCreateParentCycle(focus.id, connectionPersonId, relations)) {
+      if (wouldCreateParentCycle(focus.id, connectionPersonId, liveRelations)) {
         setBusy(false);
         setError("Bu ebeveyn bağlantısı soy ağacında döngü oluşturur.");
         return;
@@ -234,7 +253,7 @@ export function PersonRelationStudio({
         created_by: user.id,
       });
     } else if (connectionRole === "child") {
-      if (wouldCreateParentCycle(connectionPersonId, focus.id, relations)) {
+      if (wouldCreateParentCycle(connectionPersonId, focus.id, liveRelations)) {
         setBusy(false);
         setError("Bu çocuk bağlantısı soy ağacında döngü oluşturur.");
         return;
@@ -246,7 +265,7 @@ export function PersonRelationStudio({
         created_by: user.id,
       });
     } else if (connectionRole === "spouse") {
-      const alreadySpouses = relations.some(
+      const alreadySpouses = liveRelations.some(
         (relation) =>
           relation.relation_type === "spouse" &&
           ((relation.person_id === focus.id && relation.related_person_id === connectionPersonId) ||
@@ -264,7 +283,7 @@ export function PersonRelationStudio({
         created_by: user.id,
       });
     } else {
-      const parentIds = relations
+      const parentIds = liveRelations
         .filter((relation) => relation.person_id === focus.id && relation.relation_type === "parent")
         .map((relation) => relation.related_person_id);
       if (parentIds.length === 0) {
@@ -273,7 +292,7 @@ export function PersonRelationStudio({
         return;
       }
       for (const parentId of parentIds) {
-        const alreadyLinked = relations.some(
+        const alreadyLinked = liveRelations.some(
           (relation) =>
             relation.person_id === connectionPersonId &&
             relation.related_person_id === parentId &&
@@ -292,7 +311,7 @@ export function PersonRelationStudio({
 
     const uniquePending = pending.filter(
       (candidate) =>
-        !relations.some(
+        !liveRelations.some(
           (relation) =>
             relation.person_id === candidate.person_id &&
             relation.related_person_id === candidate.related_person_id &&
@@ -311,8 +330,27 @@ export function PersonRelationStudio({
       setError(insertError.message);
       return;
     }
+    setLiveRelations((prev) => [
+      ...prev,
+      ...uniquePending.map((r, i) => ({
+        id: `optimistic-link-${connectionPersonId}-${i}`,
+        person_id: r.person_id,
+        related_person_id: r.related_person_id,
+        relation_type: r.relation_type,
+      })),
+    ]);
+    setFreshIds((prev) => new Set(prev).add(connectionPersonId));
+    window.setTimeout(() => {
+      setFreshIds((prev) => {
+        const next = new Set(prev);
+        next.delete(connectionPersonId);
+        return next;
+      });
+    }, 1200);
     setConnectionsOpen(false);
     setConnectionPersonId("");
+    setPulse(true);
+    window.setTimeout(() => setPulse(false), 700);
     router.refresh();
   }
 
@@ -321,15 +359,19 @@ export function PersonRelationStudio({
     if (!ok) return;
     setBusy(true);
     setError(null);
-    const { error: deleteError } = await createClient()
-      .from("person_relations")
-      .delete()
-      .eq("id", relationId);
-    setBusy(false);
-    if (deleteError) {
-      setError(deleteError.message);
-      return;
+    if (!relationId.startsWith("optimistic-")) {
+      const { error: deleteError } = await createClient()
+        .from("person_relations")
+        .delete()
+        .eq("id", relationId);
+      if (deleteError) {
+        setBusy(false);
+        setError(deleteError.message);
+        return;
+      }
     }
+    setBusy(false);
+    setLiveRelations((prev) => prev.filter((r) => r.id !== relationId));
     router.refresh();
   }
 
@@ -420,7 +462,7 @@ export function PersonRelationStudio({
         });
       }
     } else if (addRole === "sibling") {
-      const parentRels = relations.filter(
+      const parentRels = liveRelations.filter(
         (r) => r.person_id === focus.id && r.relation_type === "parent",
       );
       for (const pr of parentRels) {
@@ -456,14 +498,57 @@ export function PersonRelationStudio({
     const familyPatch: { is_incomplete: boolean; founder_person_id?: string } = {
       is_incomplete: false,
     };
-    if (!founderPersonId && homePeople.length === 0) {
+    if (!founderPersonId && liveHomePeople.length === 0) {
       familyPatch.founder_person_id = created.id;
     }
     await supabase.from("families").update(familyPatch).eq("id", familyId);
 
+    const now = new Date().toISOString();
+    const optimisticPerson: Person = {
+      id: created.id,
+      family_id: familyId,
+      full_name: payload.full_name,
+      birth_year: payload.birth_year,
+      death_year: payload.death_year,
+      gender: payload.gender,
+      notes: payload.notes,
+      avatar_url: payload.avatar_url ?? null,
+      disputed: false,
+      created_by: user.id,
+      created_at: now,
+      updated_at: now,
+      deleted_at: null,
+    };
+    const optimisticRels: PersonRelation[] = rels.map((r, i) => ({
+      id: `optimistic-${created.id}-${i}`,
+      person_id: r.person_id,
+      related_person_id: r.related_person_id,
+      relation_type: r.relation_type,
+    }));
+
+    setLivePeople((prev) =>
+      prev.some((p) => p.id === optimisticPerson.id) ? prev : [...prev, optimisticPerson],
+    );
+    setLiveHomePeople((prev) =>
+      prev.some((p) => p.id === optimisticPerson.id) ? prev : [...prev, optimisticPerson],
+    );
+    if (optimisticRels.length) {
+      setLiveRelations((prev) => [...prev, ...optimisticRels]);
+    }
+    setFreshIds((prev) => new Set(prev).add(created.id));
+    window.setTimeout(() => {
+      setFreshIds((prev) => {
+        const next = new Set(prev);
+        next.delete(created.id);
+        return next;
+      });
+    }, 1200);
+
     setBusy(false);
     setDraft(emptyDraft());
     setAddRole(null);
+    setPulse(true);
+    window.setTimeout(() => setPulse(false), 700);
     // Stay on the person we were editing when adding children (or a sibling);
     // jump to the new person only for parent/spouse so the map follows them.
     if (addRole === "parent" || addRole === "spouse") {
@@ -505,7 +590,7 @@ export function PersonRelationStudio({
     router.refresh();
   }
 
-  if (people.length === 0) {
+  if (livePeople.length === 0) {
     return (
       <div className="mb-8 rounded-[18px] border border-dashed border-border bg-bg-surface/70 px-5 py-10 text-center">
         <p className="text-[16px] font-semibold tracking-[-0.02em]">İlişki haritası boş</p>
@@ -527,14 +612,14 @@ export function PersonRelationStudio({
       className={cn(
         "kinship-studio animate-fade-up",
         fullscreen
-          ? "fixed inset-0 z-[70] flex h-dvh max-h-dvh w-screen max-w-[100vw] flex-col overflow-hidden bg-[#EEF4F8] p-3 sm:p-5"
-          : "relative mb-10 w-full max-w-full",
+          ? "kinship-studio-fullscreen fixed inset-0 z-[70] flex h-dvh max-h-dvh w-screen max-w-[100vw] flex-col overflow-hidden bg-[#EEF4F8] p-3 sm:p-5"
+          : "relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] mb-10 w-screen max-w-[100vw]",
       )}
     >
       <div
         className={cn(
-          "mx-auto flex w-full min-w-0 max-w-full flex-col",
-          fullscreen && "h-full max-w-[1600px]",
+          "mx-auto flex w-full min-w-0 shrink-0 flex-col px-4 sm:px-6",
+          fullscreen ? "max-w-[1600px] px-0 sm:px-0" : "max-w-5xl",
         )}
       >
         <div className="mb-3 flex shrink-0 flex-col gap-3 sm:mb-4 sm:flex-row sm:items-end sm:justify-between">
@@ -546,18 +631,16 @@ export function PersonRelationStudio({
               </p>
             </div>
             <h2 className="text-[22px] font-semibold tracking-[-0.04em] sm:text-[28px]">İlişki haritası</h2>
-            {!fullscreen && (
-              <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
-                Bir kişiyi merkeze al; yalnızca ebeveyn ve eş bağlarını kur. Kardeş, teyze, kuzen ve yeğen
-                gibi akrabalıklar otomatik hesaplanır.
-              </p>
-            )}
+            <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-text-secondary">
+              Bir kişiyi merkeze al; yalnızca ebeveyn ve eş bağlarını kur. Kardeş, teyze, kuzen ve yeğen
+              gibi akrabalıklar otomatik hesaplanır.
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <label className="kinship-focus-picker">
               <span>Odak</span>
               <select value={focusId ?? ""} onChange={(event) => setFocusId(event.target.value)}>
-                {people.map((person) => (
+                {livePeople.map((person) => (
                   <option key={person.id} value={person.id}>
                     {person.full_name}
                     {person.id === founderPersonId ? " · kurucu" : ""}
@@ -577,25 +660,33 @@ export function PersonRelationStudio({
             </Button>
           </div>
         </div>
+      </div>
 
+      <div
+        className={cn(
+          "kinship-canvas relative min-w-0 max-w-full overflow-x-hidden",
+          fullscreen
+            ? "min-h-0 flex-1 overflow-y-auto rounded-[24px] border border-white/80 p-3 sm:p-6"
+            : "min-h-[min(70dvh,640px)] overflow-y-visible py-6 sm:py-8",
+        )}
+      >
+        <div className="kinship-orb kinship-orb-one" aria-hidden />
+        <div className="kinship-orb kinship-orb-two" aria-hidden />
         <div
           className={cn(
-            "kinship-canvas relative min-w-0 max-w-full overflow-x-hidden overflow-y-auto rounded-[24px] border border-white/80 p-3 sm:p-6",
-            fullscreen ? "min-h-0 flex-1" : "min-h-[min(70dvh,640px)]",
+            "relative z-[1] mx-auto flex w-full min-w-0 max-w-5xl flex-col justify-center px-4 sm:px-6",
+            fullscreen ? "min-h-full max-w-none py-2 px-0 sm:px-0" : "min-h-[520px]",
           )}
         >
-          <div className="kinship-orb kinship-orb-one" aria-hidden />
-          <div className="kinship-orb kinship-orb-two" aria-hidden />
-          <div
-            className={cn(
-              "relative z-[1] flex w-full min-w-0 max-w-full flex-col justify-center",
-              fullscreen ? "min-h-full py-2" : "min-h-[520px]",
-            )}
-          >
         {/* Parents of focus only */}
         <TreeBand label="Ebeveynler">
           {(links?.parents ?? []).map((p) => (
-            <PersonChip key={p.id} person={p} onSelect={() => setFocusId(p.id)} />
+            <PersonChip
+              key={p.id}
+              person={p}
+              fresh={freshIds.has(p.id)}
+              onSelect={() => setFocusId(p.id)}
+            />
           ))}
           <AddChip label="+ Ebeveyn" onClick={() => openAdd("parent")} />
         </TreeBand>
@@ -628,6 +719,7 @@ export function PersonRelationStudio({
               <HeroPersonCard
                 person={primarySpouse}
                 variant="partner"
+                pulse={freshIds.has(primarySpouse.id)}
                 onSelect={() => setFocusId(primarySpouse.id)}
               />
             ) : (
@@ -661,7 +753,12 @@ export function PersonRelationStudio({
         {extraSpouses.length > 0 && (
           <div className="mt-3 flex flex-wrap justify-center gap-2">
             {extraSpouses.map((p) => (
-              <PersonChip key={p.id} person={p} onSelect={() => setFocusId(p.id)} />
+              <PersonChip
+                key={p.id}
+                person={p}
+                fresh={freshIds.has(p.id)}
+                onSelect={() => setFocusId(p.id)}
+              />
             ))}
           </div>
         )}
@@ -675,7 +772,12 @@ export function PersonRelationStudio({
 
         <TreeBand label="Çocuklar">
           {(links?.children ?? []).map((p) => (
-            <PersonChip key={p.id} person={p} onSelect={() => setFocusId(p.id)} />
+            <PersonChip
+              key={p.id}
+              person={p}
+              fresh={freshIds.has(p.id)}
+              onSelect={() => setFocusId(p.id)}
+            />
           ))}
           <AddChip label="+ Çocuk" onClick={() => openAdd("child")} />
         </TreeBand>
@@ -686,8 +788,8 @@ export function PersonRelationStudio({
       {connectionsOpen && focus && (
         <ConnectionSheet
           focus={focus}
-          people={people}
-          relations={relations}
+          people={livePeople}
+          relations={liveRelations}
           role={connectionRole}
           selectedPersonId={connectionPersonId}
           busy={busy}
@@ -735,7 +837,6 @@ export function PersonRelationStudio({
           saveLabel="Güncelle"
         />
       )}
-      </div>
     </section>
   );
 }
@@ -882,6 +983,7 @@ function HeroPersonCard({
       className={cn(
         "pressable relative w-[min(210px,46vw)] max-w-[210px] shrink-0 rounded-[22px] border px-4 py-4 text-center shadow-[0_14px_38px_rgba(30,50,70,0.12)] ring-2 transition-all hover:-translate-y-1 hover:shadow-[0_20px_46px_rgba(30,50,70,0.18)]",
         genderRing,
+        pulse && "kinship-pop",
       )}
     >
       {inner}
@@ -1194,11 +1296,13 @@ function PersonChip({
   onSelect,
   large = false,
   tone,
+  fresh = false,
 }: {
   person: Person;
   onSelect: () => void;
   large?: boolean;
   tone?: "spouse";
+  fresh?: boolean;
 }) {
   return (
     <button
@@ -1208,6 +1312,7 @@ function PersonChip({
         "pressable flex items-center gap-2 rounded-[14px] border bg-bg-surface text-left shadow-[var(--shadow)] hover:border-border",
         large ? "min-w-[148px] px-3 py-2.5" : "min-w-[120px] max-w-[160px] px-2.5 py-2",
         tone === "spouse" ? "border-accent/35" : "border-border-soft",
+        fresh && "kinship-pop",
       )}
     >
       <PersonAvatar person={person} size={large ? "md" : "sm"} />

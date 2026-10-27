@@ -25,13 +25,13 @@ export function SiteHeader() {
         <nav className="flex items-center gap-1 sm:gap-2">
           <Link
             href="/archive"
-            className="pressable rounded-full px-2.5 py-1.5 text-[13px] font-medium text-text-secondary hover:text-text sm:px-3"
+            className="pressable hidden rounded-full px-2.5 py-1.5 text-[13px] font-medium text-text-secondary hover:text-text sm:inline sm:px-3"
           >
             {t("nav.archive")}
           </Link>
           <Link
             href="/villages"
-            className="pressable rounded-full px-3 py-1.5 text-[13px] font-medium text-text-secondary hover:text-text"
+            className="pressable rounded-full px-2.5 py-1.5 text-[13px] font-medium text-text-secondary hover:text-text sm:px-3"
           >
             {t("nav.villages")}
           </Link>
@@ -42,7 +42,7 @@ export function SiteHeader() {
           ) : (
             <Link
               href={girisHref}
-              className="pressable inline-flex items-center justify-center rounded-full border border-border-soft bg-bg-surface px-3.5 py-1.5 text-[13px] font-medium text-text titanium-surface hover:border-border"
+              className="pressable inline-flex min-h-10 items-center justify-center rounded-full bg-[#1A4A3E] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_8px_22px_rgba(26,74,62,0.28)] hover:bg-[#163D33]"
             >
               {t("nav.signIn")}
             </Link>

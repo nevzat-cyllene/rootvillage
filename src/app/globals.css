@@ -279,6 +279,16 @@ select {
     linear-gradient(rgba(255, 255, 255, 0.58), rgba(244, 249, 252, 0.76)),
     radial-gradient(circle at 1px 1px, rgba(60, 91, 120, 0.16) 1px, transparent 0);
   background-size: auto, 22px 22px;
+}
+
+/* Edge-bleed (default): no card chrome — theme runs to viewport edges */
+.kinship-studio:not(.kinship-studio-fullscreen) .kinship-canvas {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Optional fullscreen keeps a soft inset lift */
+.kinship-studio-fullscreen .kinship-canvas {
   box-shadow:
     0 26px 70px rgba(35, 65, 91, 0.13),
     inset 0 1px 0 rgba(255, 255, 255, 0.95);
@@ -422,6 +432,34 @@ html.atlas-immersive main {
 
 html.atlas-immersive .install-prompt {
   display: none;
+}
+
+html.kinship-immersive .install-prompt {
+  display: none;
+}
+
+/* Push sticky header below the install invite banner */
+header.sticky {
+  top: var(--install-banner-h, 0px);
+}
+
+@keyframes kinship-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.92);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.kinship-pop {
+  animation: kinship-pop 0.55s cubic-bezier(0.2, 0.85, 0.25, 1) both;
 }
 
 /* Sibling perspective fan */

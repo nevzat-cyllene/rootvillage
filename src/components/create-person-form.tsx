@@ -131,6 +131,11 @@ export function CreatePersonForm({
     setNotes("");
     setParentId("");
     setRestoredNotice(false);
+    // First person: hard navigate so the empty studio remounts with founder (avoids SW/RSC stall).
+    if (people.length === 0) {
+      window.location.assign(`/family/${familyId}`);
+      return;
+    }
     router.refresh();
   }
 

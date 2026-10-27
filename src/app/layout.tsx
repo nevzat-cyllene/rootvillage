@@ -36,10 +36,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#fafafa",
+  themeColor: "#0F2A24",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: "cover",
 };
 
@@ -56,14 +55,14 @@ export default async function RootLayout({
 
   return (
     <html lang="tr" className={`${GeistSans.variable} ${GeistMono.variable}`}>
-      <body className="min-h-dvh font-sans antialiased">
+      <body className="min-h-dvh overflow-x-clip font-sans antialiased">
         <LocaleProvider>
           <AuthProvider initialUser={user} initialProfile={profile}>
+            <InstallPrompt />
             <SiteHeader />
             <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-8 sm:px-6">
               {children}
             </main>
-            <InstallPrompt />
           </AuthProvider>
         </LocaleProvider>
       </body>
