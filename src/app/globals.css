@@ -430,17 +430,10 @@ html.atlas-immersive main {
   margin: 0;
 }
 
-/* Install banner: hide when already installed (set before paint in head). */
+/* Install banner: hide ONLY when already running as installed PWA.
+   Do not CSS-hide on desktop width — that also hid phones on "Desktop site". */
 html[data-standalone] .install-prompt {
   display: none !important;
-}
-
-/* Hide on true desktop mouse layouts unless phone/touch/BIP unlocked
-   the surface (data-show-install) or ?install=1. */
-@media (hover: hover) and (pointer: fine) and (min-width: 901px) {
-  html:not([data-force-install]):not([data-show-install]) .install-prompt {
-    display: none !important;
-  }
 }
 
 /* Push sticky header below the install invite banner */

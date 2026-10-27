@@ -59,7 +59,7 @@ export default async function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var d=document.documentElement;var s=window.matchMedia('(display-mode: standalone)').matches||!!window.navigator.standalone;if(s)d.setAttribute('data-standalone','1');if(new URLSearchParams(location.search).get('install')==='1')d.setAttribute('data-force-install','');var ua=navigator.userAgent;var mobile=/Android|iPhone|iPad|iPod|Mobile/i.test(ua)||(navigator.maxTouchPoints||0)>0||window.matchMedia('(pointer: coarse)').matches||window.matchMedia('(max-width: 900px)').matches;if(!s&&mobile)d.setAttribute('data-show-install','');}catch(e){}window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__sopInstallPrompt=e;document.documentElement.setAttribute('data-show-install','');window.dispatchEvent(new Event('sop:install-ready'));});if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){});}})();",
+              "(function(){try{var d=document.documentElement;var s=window.matchMedia('(display-mode: standalone)').matches||!!window.navigator.standalone;if(s)d.setAttribute('data-standalone','1');else d.setAttribute('data-show-install','');if(new URLSearchParams(location.search).get('install')==='1')d.setAttribute('data-force-install','');}catch(e){}window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__sopInstallPrompt=e;document.documentElement.setAttribute('data-show-install','');window.dispatchEvent(new Event('sop:install-ready'));});if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){});}})();",
           }}
         />
       </head>

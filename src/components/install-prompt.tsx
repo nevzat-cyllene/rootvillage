@@ -108,7 +108,8 @@ export function InstallPrompt() {
     const forced = isForcedInstall();
     const ios = detectIos();
     const hasBip = Boolean(window.__sopInstallPrompt);
-    const showSurface = shouldShowInstallSurface(hasBip);
+    // Always unlock banner in browser tabs (standalone still hides).
+    const showSurface = !standalone;
     setIsIos(ios);
     if (ios) setShowInstallHelp(true);
 
@@ -127,6 +128,9 @@ export function InstallPrompt() {
       showSurface,
       hasBip,
       cssWouldHideDesktop,
+      displayModeStandalone: window.matchMedia("(display-mode: standalone)").matches,
+      // @ts-expect-error iOS
+      iosStandalone: window.navigator.standalone === true,
       ua: window.navigator.userAgent.slice(0, 140),
       innerWidth: window.innerWidth,
       maxTouchPoints: window.navigator.maxTouchPoints,
