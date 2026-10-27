@@ -15,6 +15,15 @@ declare global {
   }
 }
 
+const DISMISS_KEY = "sop-install-dismissed-at";
+const DISMISS_DAYS = 14;
+/** Soft engagement wait before soft-prompt (no BIP). */
+const ENGAGE_MS = 25_000;
+/** Even if BIP is ready early, never flash the banner in the first seconds. */
+const MIN_DELAY_MS = 8_000;
+/** Scroll past this → engaged enough to show (after MIN_DELAY_MS). */
+const SCROLL_ENGAGE_PX = 480;
+
 function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
   return (
@@ -30,6 +39,26 @@ function isForcedInstall(): boolean {
     return new URLSearchParams(window.location.search).get("install") === "1";
   } catch {
     return false;
+  }
+}
+
+function wasDismissedRecently(): boolean {
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY);
+    if (!raw) return false;
+    const at = Number(raw);
+    if (!Number.isFinite(at)) return false;
+    return Date.now() - at < DISMISS_DAYS * 24 * 60 * 60 * 1000;
+  } catch {
+    return false;
+  }
+}
+
+function markDismissed() {
+  try {
+    localStorage.setItem(DISMISS_KEY, String(Date.now()));
+  } catch {
+    // ignore
   }
 }
 
@@ -62,19 +91,59 @@ export function InstallPrompt() {
     document.documentElement.toggleAttribute("data-force-install", forced);
     document.documentElement.setAttribute("data-show-install", "");
 
-    // Already running as installed app → no invite.
     if (standalone) {
       setVisible(false);
       return;
     }
 
-    setVisible(true);
+    // Test / forced path only — skip engagement delay.
+    if (forced) {
+      setVisible(true);
+      if (window.__sopInstallPrompt) {
+        setDeferred(window.__sopInstallPrompt);
+        setShowInstallHelp(false);
+      }
+    } else if (wasDismissedRecently()) {
+      return;
+    }
+
+    let shown = forced;
+    const startedAt = Date.now();
+    const timers: number[] = [];
+
+    const reveal = () => {
+      if (shown) return;
+      if (!forced && wasDismissedRecently()) return;
+      shown = true;
+      setVisible(true);
+    };
+
+    const maybeReveal = (reason: "bip" | "timer" | "scroll") => {
+      if (shown) return;
+      const elapsed = Date.now() - startedAt;
+      if (reason === "bip") {
+        // Chrome already applied engagement heuristics; still avoid instant flash.
+        if (elapsed >= MIN_DELAY_MS) reveal();
+        else {
+          timers.push(
+            window.setTimeout(reveal, MIN_DELAY_MS - elapsed) as unknown as number,
+          );
+        }
+        return;
+      }
+      if (reason === "scroll" && elapsed >= MIN_DELAY_MS) {
+        reveal();
+        return;
+      }
+      if (reason === "timer") reveal();
+    };
 
     const acceptPrompt = (prompt: BeforeInstallPromptEvent) => {
       setDeferred(prompt);
-      setVisible(true);
       setShowInstallHelp(false);
+      if (!forced) maybeReveal("bip");
     };
+
     const onBip = (e: Event) => {
       e.preventDefault();
       window.__sopInstallPrompt = e as BeforeInstallPromptEvent;
@@ -83,12 +152,24 @@ export function InstallPrompt() {
     const onEarlyPrompt = () => {
       if (window.__sopInstallPrompt) acceptPrompt(window.__sopInstallPrompt);
     };
-    const onInstalled = () => setVisible(false);
+    const onInstalled = () => {
+      setVisible(false);
+      markDismissed();
+    };
+    const onScroll = () => {
+      if (window.scrollY >= SCROLL_ENGAGE_PX) maybeReveal("scroll");
+    };
 
     window.addEventListener("beforeinstallprompt", onBip);
     window.addEventListener("sop:install-ready", onEarlyPrompt);
     window.addEventListener("appinstalled", onInstalled);
+    window.addEventListener("scroll", onScroll, { passive: true });
     onEarlyPrompt();
+
+    // No BIP (Safari / iOS / already-installed criteria): soft invite after engagement wait.
+    if (!forced) {
+      timers.push(window.setTimeout(() => maybeReveal("timer"), ENGAGE_MS) as unknown as number);
+    }
 
     if ("serviceWorker" in navigator) {
       void navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -98,6 +179,8 @@ export function InstallPrompt() {
       window.removeEventListener("beforeinstallprompt", onBip);
       window.removeEventListener("sop:install-ready", onEarlyPrompt);
       window.removeEventListener("appinstalled", onInstalled);
+      window.removeEventListener("scroll", onScroll);
+      for (const id of timers) window.clearTimeout(id);
     };
   }, []);
 
@@ -123,12 +206,20 @@ export function InstallPrompt() {
     try {
       await deferred.prompt();
       const choice = await deferred.userChoice;
-      if (choice.outcome === "accepted") setVisible(false);
+      if (choice.outcome === "accepted") {
+        setVisible(false);
+        markDismissed();
+      }
     } finally {
       setInstalling(false);
       setDeferred(null);
       delete window.__sopInstallPrompt;
     }
+  }
+
+  function onClose() {
+    setVisible(false);
+    markDismissed();
   }
 
   return (
@@ -179,7 +270,7 @@ export function InstallPrompt() {
               type="button"
               className="grid h-9 w-9 place-items-center rounded-full text-[18px] text-white/75 transition hover:bg-white/10 hover:text-white"
               aria-label="Kapat"
-              onClick={() => setVisible(false)}
+              onClick={onClose}
             >
               ×
             </button>
