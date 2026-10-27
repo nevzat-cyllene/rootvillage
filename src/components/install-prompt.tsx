@@ -43,45 +43,12 @@ function detectIos(): boolean {
   );
 }
 
-function dbgLog(
-  hypothesisId: string,
-  location: string,
-  message: string,
-  data: Record<string, unknown>,
-) {
-  // #region agent log
-  const payload = {
-    sessionId: "ffc48a",
-    runId: "post-fix-3",
-    hypothesisId,
-    location,
-    message,
-    data,
-    timestamp: Date.now(),
-  };
-  const body = JSON.stringify(payload);
-  fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" },
-    body,
-  }).catch(() => {});
-  // Phone / production → same-origin API (writes log when reachable)
-  fetch("/api/debug-ingest", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
-  }).catch(() => {});
-  // #endregion
-}
-
 export function InstallPrompt() {
-  // SSR + first paint visible. Desktop: CSS. Standalone: early head attr + effect.
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(true);
   const [isIos, setIsIos] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
-  const [gateNote, setGateNote] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -95,36 +62,10 @@ export function InstallPrompt() {
     document.documentElement.toggleAttribute("data-force-install", forced);
     if (standalone) {
       document.documentElement.setAttribute("data-standalone", "1");
-    } else {
-      document.documentElement.removeAttribute("data-standalone");
-    }
-
-    const gate = {
-      standalone,
-      forced,
-      ios,
-      bip: Boolean(window.__sopInstallPrompt),
-      ua: window.navigator.userAgent.slice(0, 120),
-      displayMode: window.matchMedia("(display-mode: standalone)").matches
-        ? "standalone"
-        : "browser",
-      innerWidth: window.innerWidth,
-      fine: window.matchMedia("(pointer: fine)").matches,
-      hover: window.matchMedia("(hover: hover)").matches,
-      path: window.location.pathname + window.location.search,
-    };
-    setGateNote(
-      `stand=${standalone} bip=${gate.bip} ios=${ios} w=${gate.innerWidth}`,
-    );
-
-    dbgLog("H1_H2", "install-prompt.tsx:mount", "install mount (no mobile JS hide)", gate);
-
-    // Only hide when already installed as PWA. Desktop hide is CSS-only (H1 fix).
-    if (standalone) {
       setVisible(false);
-      dbgLog("H2", "install-prompt.tsx:standalone", "hidden: already standalone", gate);
       return;
     }
+    document.documentElement.removeAttribute("data-standalone");
     setVisible(true);
 
     const acceptPrompt = (prompt: BeforeInstallPromptEvent) => {
@@ -136,17 +77,11 @@ export function InstallPrompt() {
       e.preventDefault();
       window.__sopInstallPrompt = e as BeforeInstallPromptEvent;
       acceptPrompt(e as BeforeInstallPromptEvent);
-      dbgLog("H4", "install-prompt.tsx:bip", "beforeinstallprompt fired", {
-        path: window.location.pathname,
-      });
     };
     const onEarlyPrompt = () => {
       if (window.__sopInstallPrompt) acceptPrompt(window.__sopInstallPrompt);
     };
-    const onInstalled = () => {
-      setVisible(false);
-      dbgLog("H4", "install-prompt.tsx:appinstalled", "appinstalled event", {});
-    };
+    const onInstalled = () => setVisible(false);
 
     window.addEventListener("beforeinstallprompt", onBip);
     window.addEventListener("sop:install-ready", onEarlyPrompt);
@@ -154,20 +89,7 @@ export function InstallPrompt() {
     onEarlyPrompt();
 
     if ("serviceWorker" in navigator) {
-      void navigator.serviceWorker
-        .register("/sw.js")
-        .then((registration) => {
-          dbgLog("H4", "install-prompt.tsx:sw", "service worker registered", {
-            scope: registration.scope,
-            active: Boolean(registration.active),
-            controller: Boolean(navigator.serviceWorker.controller),
-          });
-        })
-        .catch((error: unknown) => {
-          dbgLog("H4", "install-prompt.tsx:sw-error", "service worker failed", {
-            error: String(error),
-          });
-        });
+      void navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
 
     return () => {
@@ -183,19 +105,6 @@ export function InstallPrompt() {
       return;
     }
     document.documentElement.style.setProperty("--install-banner-h", "58px");
-    const banner = document.querySelector(".install-prompt");
-    const style = banner ? window.getComputedStyle(banner) : null;
-    dbgLog("H3_H5", "install-prompt.tsx:visible", "banner still visible", {
-      hasBanner: Boolean(banner),
-      display: style?.display ?? null,
-      visibility: style?.visibility ?? null,
-      opacity: style?.opacity ?? null,
-      zIndex: style?.zIndex ?? null,
-      cssHiddenByDesktopMedia:
-        style?.display === "none" &&
-        window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 901px)")
-          .matches,
-    });
     return () => {
       document.documentElement.style.removeProperty("--install-banner-h");
     };
@@ -204,10 +113,6 @@ export function InstallPrompt() {
   if (!visible) return null;
 
   async function onInstall() {
-    dbgLog("H4", "install-prompt.tsx:click", "Yukle/Indir clicked", {
-      hasDeferred: Boolean(deferred),
-      isIos,
-    });
     if (!deferred) {
       setShowInstallHelp(true);
       return;
@@ -216,12 +121,7 @@ export function InstallPrompt() {
     try {
       await deferred.prompt();
       const choice = await deferred.userChoice;
-      dbgLog("H4", "install-prompt.tsx:choice", "userChoice", {
-        outcome: choice.outcome,
-      });
-      if (choice.outcome === "accepted") {
-        setVisible(false);
-      }
+      if (choice.outcome === "accepted") setVisible(false);
     } finally {
       setInstalling(false);
       setDeferred(null);
@@ -270,9 +170,7 @@ export function InstallPrompt() {
             type="button"
             className="grid h-9 w-9 place-items-center rounded-full text-[18px] text-white/75 transition hover:bg-white/10 hover:text-white"
             aria-label="Kapat"
-            onClick={() => {
-              setVisible(false);
-            }}
+            onClick={() => setVisible(false)}
           >
             ×
           </button>
@@ -292,9 +190,6 @@ export function InstallPrompt() {
               <strong>Ana ekrana ekle</strong>
             </>
           )}
-          {isForcedInstall() && gateNote ? (
-            <p className="mt-1 font-mono text-[9px] text-white/45">{gateNote}</p>
-          ) : null}
         </div>
       )}
     </div>
