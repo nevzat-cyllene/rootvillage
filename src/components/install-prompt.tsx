@@ -43,35 +43,6 @@ function detectIos(): boolean {
   );
 }
 
-function dbgLog(
-  hypothesisId: string,
-  location: string,
-  message: string,
-  data: Record<string, unknown>,
-) {
-  // #region agent log
-  const payload = JSON.stringify({
-    sessionId: "ffc48a",
-    runId: "banner-clean-1",
-    hypothesisId,
-    location,
-    message,
-    data,
-    timestamp: Date.now(),
-  });
-  fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" },
-    body: payload,
-  }).catch(() => {});
-  fetch("/api/debug-ingest", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: payload,
-  }).catch(() => {});
-  // #endregion
-}
-
 export function InstallPrompt() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
@@ -91,20 +62,7 @@ export function InstallPrompt() {
     document.documentElement.toggleAttribute("data-force-install", forced);
     document.documentElement.setAttribute("data-show-install", "");
 
-    dbgLog("H3", "install-prompt.tsx:mount", "install banner gate", {
-      standalone,
-      forced,
-      hasBip: Boolean(window.__sopInstallPrompt),
-      displayMode: window.matchMedia("(display-mode: standalone)").matches
-        ? "standalone"
-        : "browser",
-      // @ts-expect-error iOS
-      iosStandalone: window.navigator.standalone === true,
-      path: window.location.href,
-      ua: window.navigator.userAgent.slice(0, 120),
-    });
-
-    // Already installed PWA → no banner (orange diagnostic removed).
+    // Already running as installed app → no invite.
     if (standalone) {
       setVisible(false);
       return;
@@ -237,7 +195,7 @@ export function InstallPrompt() {
               </>
             ) : (
               <>
-                Chrome: sağ üst <strong>⋮</strong> → <strong>Uygulamayı yükle</strong> veya{" "}
+                Tarayıcı menüsü (⋮) → <strong>Uygulamayı yükle</strong> veya{" "}
                 <strong>Ana ekrana ekle</strong>
               </>
             )}
