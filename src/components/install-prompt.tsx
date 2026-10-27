@@ -24,43 +24,76 @@ function isStandalone(): boolean {
   );
 }
 
-/** Phone/tablet only — never show on desktop mouse layouts. */
-function isMobileClient(): boolean {
+function isForcedInstall(): boolean {
   if (typeof window === "undefined") return false;
+  try {
+    return new URLSearchParams(window.location.search).get("install") === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Prefer phones/tablets; CSS also hides true desktop mouse layouts. */
+function isMobileClient(): boolean {
+  if (typeof window === "undefined") return true; // SSR: render; CSS hides desktop
   const ua = window.navigator.userAgent.toLowerCase();
   if (/android|iphone|ipad|ipod|webos|blackberry|iemobile|opera mini|mobile/.test(ua)) {
     return true;
   }
-  // iPadOS 13+ desktop UA
+  // Chrome Client Hints when available
+  const uaData = (
+    window.navigator as Navigator & { userAgentData?: { mobile?: boolean } }
+  ).userAgentData;
+  if (uaData?.mobile) return true;
+  // iPadOS desktop UA
   if (
     window.navigator.platform === "MacIntel" &&
     (window.navigator.maxTouchPoints ?? 0) > 1
   ) {
     return true;
   }
-  // Touch phone/tablet without "Mobile" in UA
-  return (
-    window.matchMedia("(pointer: coarse)").matches &&
-    window.matchMedia("(max-width: 900px)").matches
-  );
+  // Phone with "Desktop site" requested: still narrow + touch
+  const narrow =
+    window.matchMedia("(max-width: 900px)").matches || window.innerWidth <= 900;
+  const touch =
+    window.matchMedia("(pointer: coarse)").matches ||
+    (window.navigator.maxTouchPoints ?? 0) > 1 ||
+    window.matchMedia("(hover: none)").matches;
+  return narrow && touch;
+}
+
+function dbgLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
+  // #region agent log
+  fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" },
+    body: JSON.stringify({
+      sessionId: "ffc48a",
+      runId: "post-fix-2",
+      hypothesisId,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
 }
 
 export function InstallPrompt() {
+  // SSR + first paint: visible. Desktop is hidden via CSS; standalone hides in effect.
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(true);
   const [isIos, setIsIos] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const standalone = isStandalone();
-    const mobile = isMobileClient();
-    // #region agent log
-    fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" }, body: JSON.stringify({ sessionId: "ffc48a", runId: "post-fix", hypothesisId: "A_B_C", location: "install-prompt.tsx:mount", message: "install mount gate", data: { standalone, mobile, capturedEarly: Boolean(window.__sopInstallPrompt), ua: window.navigator.userAgent, platform: window.navigator.platform, maxTouchPoints: window.navigator.maxTouchPoints, coarse: window.matchMedia("(pointer: coarse)").matches, narrow: window.matchMedia("(max-width: 900px)").matches, path: window.location.pathname }, timestamp: Date.now() }) }).catch(() => {});
-    // #endregion
-    if (standalone || !mobile) return;
 
+    const standalone = isStandalone();
+    const forced = isForcedInstall();
+    const mobile = isMobileClient();
     const ua = window.navigator.userAgent.toLowerCase();
     const ios =
       /iphone|ipad|ipod/.test(ua) ||
@@ -68,7 +101,32 @@ export function InstallPrompt() {
         (window.navigator.maxTouchPoints ?? 0) > 1);
     setIsIos(ios);
 
-    // Show immediately on mobile — do not wait for beforeinstallprompt.
+    document.documentElement.toggleAttribute("data-force-install", forced);
+
+    dbgLog("A_B_C", "install-prompt.tsx:mount", "install mount gate", {
+      standalone,
+      forced,
+      mobile,
+      capturedEarly: Boolean(window.__sopInstallPrompt),
+      ua: window.navigator.userAgent,
+      platform: window.navigator.platform,
+      maxTouchPoints: window.navigator.maxTouchPoints,
+      coarse: window.matchMedia("(pointer: coarse)").matches,
+      hoverNone: window.matchMedia("(hover: none)").matches,
+      narrow: window.matchMedia("(max-width: 900px)").matches,
+      innerWidth: window.innerWidth,
+      path: window.location.pathname,
+      search: window.location.search,
+    });
+
+    if (standalone) {
+      setVisible(false);
+      return;
+    }
+    if (!mobile && !forced) {
+      setVisible(false);
+      return;
+    }
     setVisible(true);
 
     const acceptPrompt = (prompt: BeforeInstallPromptEvent) => {
@@ -79,9 +137,9 @@ export function InstallPrompt() {
       e.preventDefault();
       window.__sopInstallPrompt = e as BeforeInstallPromptEvent;
       acceptPrompt(e as BeforeInstallPromptEvent);
-      // #region agent log
-      fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" }, body: JSON.stringify({ sessionId: "ffc48a", runId: "post-fix", hypothesisId: "D", location: "install-prompt.tsx:bip", message: "beforeinstallprompt fired", data: { path: window.location.pathname }, timestamp: Date.now() }) }).catch(() => {});
-      // #endregion
+      dbgLog("D", "install-prompt.tsx:bip", "beforeinstallprompt fired", {
+        path: window.location.pathname,
+      });
     };
     const onEarlyPrompt = () => {
       if (window.__sopInstallPrompt) acceptPrompt(window.__sopInstallPrompt);
@@ -91,20 +149,26 @@ export function InstallPrompt() {
     onEarlyPrompt();
 
     if ("serviceWorker" in navigator) {
-      void navigator.serviceWorker.register("/sw.js").then((registration) => {
-        // #region agent log
-        fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" }, body: JSON.stringify({ sessionId: "ffc48a", runId: "pre-fix-2", hypothesisId: "D", location: "install-prompt.tsx:sw", message: "service worker registered", data: { scope: registration.scope, active: Boolean(registration.active), controller: Boolean(navigator.serviceWorker.controller) }, timestamp: Date.now() }) }).catch(() => {});
-        // #endregion
-      }).catch((error: unknown) => {
-        // #region agent log
-        fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" }, body: JSON.stringify({ sessionId: "ffc48a", runId: "pre-fix-2", hypothesisId: "D", location: "install-prompt.tsx:sw-error", message: "service worker failed", data: { error: String(error) }, timestamp: Date.now() }) }).catch(() => {});
-        // #endregion
-      });
+      void navigator.serviceWorker
+        .register("/sw.js")
+        .then((registration) => {
+          dbgLog("D", "install-prompt.tsx:sw", "service worker registered", {
+            scope: registration.scope,
+            active: Boolean(registration.active),
+            controller: Boolean(navigator.serviceWorker.controller),
+          });
+        })
+        .catch((error: unknown) => {
+          dbgLog("D", "install-prompt.tsx:sw-error", "service worker failed", {
+            error: String(error),
+          });
+        });
     }
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBip);
       window.removeEventListener("sop:install-ready", onEarlyPrompt);
+      document.documentElement.removeAttribute("data-force-install");
     };
   }, []);
 
@@ -116,15 +180,20 @@ export function InstallPrompt() {
     document.documentElement.style.setProperty("--install-banner-h", "58px");
     const banner = document.querySelector(".install-prompt");
     const style = banner ? window.getComputedStyle(banner) : null;
-    // #region agent log
-    fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" }, body: JSON.stringify({ sessionId: "ffc48a", runId: "pre-fix-2", hypothesisId: "E", location: "install-prompt.tsx:visible", message: "banner visible effect", data: { hasBanner: Boolean(banner), display: style?.display ?? null, visibility: style?.visibility ?? null, opacity: style?.opacity ?? null, zIndex: style?.zIndex ?? null, htmlClass: document.documentElement.className }, timestamp: Date.now() }) }).catch(() => {});
-    // #endregion
+    dbgLog("E", "install-prompt.tsx:visible", "banner visible effect", {
+      hasBanner: Boolean(banner),
+      display: style?.display ?? null,
+      visibility: style?.visibility ?? null,
+      opacity: style?.opacity ?? null,
+      zIndex: style?.zIndex ?? null,
+      htmlClass: document.documentElement.className,
+    });
     return () => {
       document.documentElement.style.removeProperty("--install-banner-h");
     };
   }, [visible]);
 
-  if (!visible || isStandalone()) return null;
+  if (!visible) return null;
 
   async function onInstall() {
     if (!deferred) {

@@ -430,7 +430,14 @@ html.atlas-immersive main {
   margin: 0;
 }
 
-/* Install banner stays visible above immersive atlas/kinship (z-60 > atlas z-25). */
+/* Install banner stays above immersive atlas/kinship.
+   Hide on true desktop mouse layouts; phones/tablets keep it.
+   ?install=1 sets html[data-force-install] to always show. */
+@media (hover: hover) and (pointer: fine) and (min-width: 901px) {
+  html:not([data-force-install]) .install-prompt {
+    display: none !important;
+  }
+}
 
 /* Push sticky header below the install invite banner */
 header.sticky {
