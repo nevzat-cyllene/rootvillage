@@ -59,7 +59,7 @@ export default async function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__sopInstallPrompt=e;window.dispatchEvent(new Event('sop:install-ready'));});",
+              "(function(){try{var s=window.matchMedia('(display-mode: standalone)').matches||!!window.navigator.standalone;if(s)document.documentElement.setAttribute('data-standalone','1');if(new URLSearchParams(location.search).get('install')==='1')document.documentElement.setAttribute('data-force-install','');}catch(e){}window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__sopInstallPrompt=e;window.dispatchEvent(new Event('sop:install-ready'));});if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){});}})();",
           }}
         />
       </head>

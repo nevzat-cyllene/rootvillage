@@ -33,98 +33,96 @@ function isForcedInstall(): boolean {
   }
 }
 
-/** Prefer phones/tablets; CSS also hides true desktop mouse layouts. */
-function isMobileClient(): boolean {
-  if (typeof window === "undefined") return true; // SSR: render; CSS hides desktop
+function detectIos(): boolean {
+  if (typeof window === "undefined") return false;
   const ua = window.navigator.userAgent.toLowerCase();
-  if (/android|iphone|ipad|ipod|webos|blackberry|iemobile|opera mini|mobile/.test(ua)) {
-    return true;
-  }
-  // Chrome Client Hints when available
-  const uaData = (
-    window.navigator as Navigator & { userAgentData?: { mobile?: boolean } }
-  ).userAgentData;
-  if (uaData?.mobile) return true;
-  // iPadOS desktop UA
-  if (
-    window.navigator.platform === "MacIntel" &&
-    (window.navigator.maxTouchPoints ?? 0) > 1
-  ) {
-    return true;
-  }
-  // Phone with "Desktop site" requested: still narrow + touch
-  const narrow =
-    window.matchMedia("(max-width: 900px)").matches || window.innerWidth <= 900;
-  const touch =
-    window.matchMedia("(pointer: coarse)").matches ||
-    (window.navigator.maxTouchPoints ?? 0) > 1 ||
-    window.matchMedia("(hover: none)").matches;
-  return narrow && touch;
+  return (
+    /iphone|ipad|ipod/.test(ua) ||
+    (window.navigator.platform === "MacIntel" &&
+      (window.navigator.maxTouchPoints ?? 0) > 1)
+  );
 }
 
-function dbgLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
+function dbgLog(
+  hypothesisId: string,
+  location: string,
+  message: string,
+  data: Record<string, unknown>,
+) {
   // #region agent log
+  const payload = {
+    sessionId: "ffc48a",
+    runId: "post-fix-3",
+    hypothesisId,
+    location,
+    message,
+    data,
+    timestamp: Date.now(),
+  };
+  const body = JSON.stringify(payload);
   fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" },
-    body: JSON.stringify({
-      sessionId: "ffc48a",
-      runId: "post-fix-2",
-      hypothesisId,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-    }),
+    body,
+  }).catch(() => {});
+  // Phone / production → same-origin API (writes log when reachable)
+  fetch("/api/debug-ingest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
   }).catch(() => {});
   // #endregion
 }
 
 export function InstallPrompt() {
-  // SSR + first paint: visible. Desktop is hidden via CSS; standalone hides in effect.
+  // SSR + first paint visible. Desktop: CSS. Standalone: early head attr + effect.
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(true);
   const [isIos, setIsIos] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const [gateNote, setGateNote] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const standalone = isStandalone();
     const forced = isForcedInstall();
-    const mobile = isMobileClient();
-    const ua = window.navigator.userAgent.toLowerCase();
-    const ios =
-      /iphone|ipad|ipod/.test(ua) ||
-      (window.navigator.platform === "MacIntel" &&
-        (window.navigator.maxTouchPoints ?? 0) > 1);
+    const ios = detectIos();
     setIsIos(ios);
+    if (ios) setShowInstallHelp(true);
 
     document.documentElement.toggleAttribute("data-force-install", forced);
+    if (standalone) {
+      document.documentElement.setAttribute("data-standalone", "1");
+    } else {
+      document.documentElement.removeAttribute("data-standalone");
+    }
 
-    dbgLog("A_B_C", "install-prompt.tsx:mount", "install mount gate", {
+    const gate = {
       standalone,
       forced,
-      mobile,
-      capturedEarly: Boolean(window.__sopInstallPrompt),
-      ua: window.navigator.userAgent,
-      platform: window.navigator.platform,
-      maxTouchPoints: window.navigator.maxTouchPoints,
-      coarse: window.matchMedia("(pointer: coarse)").matches,
-      hoverNone: window.matchMedia("(hover: none)").matches,
-      narrow: window.matchMedia("(max-width: 900px)").matches,
+      ios,
+      bip: Boolean(window.__sopInstallPrompt),
+      ua: window.navigator.userAgent.slice(0, 120),
+      displayMode: window.matchMedia("(display-mode: standalone)").matches
+        ? "standalone"
+        : "browser",
       innerWidth: window.innerWidth,
-      path: window.location.pathname,
-      search: window.location.search,
-    });
+      fine: window.matchMedia("(pointer: fine)").matches,
+      hover: window.matchMedia("(hover: hover)").matches,
+      path: window.location.pathname + window.location.search,
+    };
+    setGateNote(
+      `stand=${standalone} bip=${gate.bip} ios=${ios} w=${gate.innerWidth}`,
+    );
 
+    dbgLog("H1_H2", "install-prompt.tsx:mount", "install mount (no mobile JS hide)", gate);
+
+    // Only hide when already installed as PWA. Desktop hide is CSS-only (H1 fix).
     if (standalone) {
       setVisible(false);
-      return;
-    }
-    if (!mobile && !forced) {
-      setVisible(false);
+      dbgLog("H2", "install-prompt.tsx:standalone", "hidden: already standalone", gate);
       return;
     }
     setVisible(true);
@@ -132,34 +130,41 @@ export function InstallPrompt() {
     const acceptPrompt = (prompt: BeforeInstallPromptEvent) => {
       setDeferred(prompt);
       setVisible(true);
+      setShowInstallHelp(false);
     };
     const onBip = (e: Event) => {
       e.preventDefault();
       window.__sopInstallPrompt = e as BeforeInstallPromptEvent;
       acceptPrompt(e as BeforeInstallPromptEvent);
-      dbgLog("D", "install-prompt.tsx:bip", "beforeinstallprompt fired", {
+      dbgLog("H4", "install-prompt.tsx:bip", "beforeinstallprompt fired", {
         path: window.location.pathname,
       });
     };
     const onEarlyPrompt = () => {
       if (window.__sopInstallPrompt) acceptPrompt(window.__sopInstallPrompt);
     };
+    const onInstalled = () => {
+      setVisible(false);
+      dbgLog("H4", "install-prompt.tsx:appinstalled", "appinstalled event", {});
+    };
+
     window.addEventListener("beforeinstallprompt", onBip);
     window.addEventListener("sop:install-ready", onEarlyPrompt);
+    window.addEventListener("appinstalled", onInstalled);
     onEarlyPrompt();
 
     if ("serviceWorker" in navigator) {
       void navigator.serviceWorker
         .register("/sw.js")
         .then((registration) => {
-          dbgLog("D", "install-prompt.tsx:sw", "service worker registered", {
+          dbgLog("H4", "install-prompt.tsx:sw", "service worker registered", {
             scope: registration.scope,
             active: Boolean(registration.active),
             controller: Boolean(navigator.serviceWorker.controller),
           });
         })
         .catch((error: unknown) => {
-          dbgLog("D", "install-prompt.tsx:sw-error", "service worker failed", {
+          dbgLog("H4", "install-prompt.tsx:sw-error", "service worker failed", {
             error: String(error),
           });
         });
@@ -168,7 +173,7 @@ export function InstallPrompt() {
     return () => {
       window.removeEventListener("beforeinstallprompt", onBip);
       window.removeEventListener("sop:install-ready", onEarlyPrompt);
-      document.documentElement.removeAttribute("data-force-install");
+      window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);
 
@@ -180,13 +185,16 @@ export function InstallPrompt() {
     document.documentElement.style.setProperty("--install-banner-h", "58px");
     const banner = document.querySelector(".install-prompt");
     const style = banner ? window.getComputedStyle(banner) : null;
-    dbgLog("E", "install-prompt.tsx:visible", "banner visible effect", {
+    dbgLog("H3_H5", "install-prompt.tsx:visible", "banner still visible", {
       hasBanner: Boolean(banner),
       display: style?.display ?? null,
       visibility: style?.visibility ?? null,
       opacity: style?.opacity ?? null,
       zIndex: style?.zIndex ?? null,
-      htmlClass: document.documentElement.className,
+      cssHiddenByDesktopMedia:
+        style?.display === "none" &&
+        window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 901px)")
+          .matches,
     });
     return () => {
       document.documentElement.style.removeProperty("--install-banner-h");
@@ -196,6 +204,10 @@ export function InstallPrompt() {
   if (!visible) return null;
 
   async function onInstall() {
+    dbgLog("H4", "install-prompt.tsx:click", "Yukle/Indir clicked", {
+      hasDeferred: Boolean(deferred),
+      isIos,
+    });
     if (!deferred) {
       setShowInstallHelp(true);
       return;
@@ -204,6 +216,9 @@ export function InstallPrompt() {
     try {
       await deferred.prompt();
       const choice = await deferred.userChoice;
+      dbgLog("H4", "install-prompt.tsx:choice", "userChoice", {
+        outcome: choice.outcome,
+      });
       if (choice.outcome === "accepted") {
         setVisible(false);
       }
@@ -240,26 +255,17 @@ export function InstallPrompt() {
               ? "Safari’de Paylaş → Ana Ekrana Ekle ile ana ekranına kur."
               : deferred
                 ? "Tek dokunuşla ana ekrana ekle; köy hafızası cebinde."
-                : "Tarayıcı menüsünden “Ana ekrana ekle / Uygulamayı yükle” seç."}
+                : "Yükle’ye bas → tarayıcı menüsünden Ana ekrana ekle."}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          {deferred ? (
-            <Button
-              className="!border-0 !bg-white !px-3.5 !py-2 !text-[12px] !text-[#16352E] shadow-sm hover:!bg-white/90"
-              disabled={installing}
-              onClick={() => void onInstall()}
-            >
-              {installing ? "…" : "İndir"}
-            </Button>
-          ) : (
-            <Button
-              className="!border-0 !bg-white !px-3.5 !py-2 !text-[12px] !text-[#16352E] shadow-sm hover:!bg-white/90"
-              onClick={() => void onInstall()}
-            >
-              Yükle
-            </Button>
-          )}
+          <Button
+            className="!border-0 !bg-white !px-3.5 !py-2 !text-[12px] !text-[#16352E] shadow-sm hover:!bg-white/90"
+            disabled={installing}
+            onClick={() => void onInstall()}
+          >
+            {installing ? "…" : deferred ? "İndir" : "Yükle"}
+          </Button>
           <button
             type="button"
             className="grid h-9 w-9 place-items-center rounded-full text-[18px] text-white/75 transition hover:bg-white/10 hover:text-white"
@@ -272,11 +278,23 @@ export function InstallPrompt() {
           </button>
         </div>
       </div>
-      {showInstallHelp && !deferred && (
-        <div className="border-t border-white/15 bg-black/10 px-4 py-2 text-center text-[11px] font-medium text-white/90">
-          {isIos
-            ? "Safari: Paylaş simgesi → Ana Ekrana Ekle"
-            : "Tarayıcı menüsü (⋮) → Uygulamayı yükle veya Ana ekrana ekle"}
+      {(showInstallHelp || isForcedInstall()) && !deferred && (
+        <div className="border-t border-white/15 bg-black/10 px-4 py-2.5 text-center text-[11px] font-medium leading-relaxed text-white/90">
+          {isIos ? (
+            <>
+              1) Alttaki <strong>Paylaş</strong> simgesine dokun
+              <br />
+              2) <strong>Ana Ekrana Ekle</strong> → Ekle
+            </>
+          ) : (
+            <>
+              Chrome: sağ üst <strong>⋮</strong> → <strong>Uygulamayı yükle</strong> veya{" "}
+              <strong>Ana ekrana ekle</strong>
+            </>
+          )}
+          {isForcedInstall() && gateNote ? (
+            <p className="mt-1 font-mono text-[9px] text-white/45">{gateNote}</p>
+          ) : null}
         </div>
       )}
     </div>
