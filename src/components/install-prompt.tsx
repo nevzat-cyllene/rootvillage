@@ -9,10 +9,11 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
-/** Bump when invite behavior changes so old dismissals don't stick. */
-const DISMISS_KEY = "sop-install-dismissed-at-v3";
-const DISMISS_MS = 2 * 24 * 60 * 60 * 1000;
-const LEGACY_DISMISS_KEYS = ["sop-install-dismissed-at", "sop-install-dismissed-at-v2"];
+declare global {
+  interface Window {
+    __sopInstallPrompt?: BeforeInstallPromptEvent;
+  }
+}
 
 function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
@@ -44,39 +45,21 @@ function isMobileClient(): boolean {
   );
 }
 
-function wasDismissedRecently(): boolean {
-  try {
-    for (const key of LEGACY_DISMISS_KEYS) {
-      localStorage.removeItem(key);
-    }
-    const raw = localStorage.getItem(DISMISS_KEY);
-    if (!raw) return false;
-    const at = Number(raw);
-    if (!Number.isFinite(at)) return false;
-    return Date.now() - at < DISMISS_MS;
-  } catch {
-    return false;
-  }
-}
-
-function dismiss() {
-  try {
-    localStorage.setItem(DISMISS_KEY, String(Date.now()));
-  } catch {
-    /* private mode */
-  }
-}
-
 export function InstallPrompt() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
   const [isIos, setIsIos] = useState(false);
   const [installing, setInstalling] = useState(false);
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (isStandalone() || wasDismissedRecently()) return;
-    if (!isMobileClient()) return;
+    const standalone = isStandalone();
+    const mobile = isMobileClient();
+    // #region agent log
+    fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" }, body: JSON.stringify({ sessionId: "ffc48a", runId: "post-fix", hypothesisId: "A_B_C", location: "install-prompt.tsx:mount", message: "install mount gate", data: { standalone, mobile, capturedEarly: Boolean(window.__sopInstallPrompt), ua: window.navigator.userAgent, platform: window.navigator.platform, maxTouchPoints: window.navigator.maxTouchPoints, coarse: window.matchMedia("(pointer: coarse)").matches, narrow: window.matchMedia("(max-width: 900px)").matches, path: window.location.pathname }, timestamp: Date.now() }) }).catch(() => {});
+    // #endregion
+    if (standalone || !mobile) return;
 
     const ua = window.navigator.userAgent.toLowerCase();
     const ios =
@@ -88,19 +71,40 @@ export function InstallPrompt() {
     // Show immediately on mobile — do not wait for beforeinstallprompt.
     setVisible(true);
 
-    const onBip = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
+    const acceptPrompt = (prompt: BeforeInstallPromptEvent) => {
+      setDeferred(prompt);
       setVisible(true);
     };
+    const onBip = (e: Event) => {
+      e.preventDefault();
+      window.__sopInstallPrompt = e as BeforeInstallPromptEvent;
+      acceptPrompt(e as BeforeInstallPromptEvent);
+      // #region agent log
+      fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" }, body: JSON.stringify({ sessionId: "ffc48a", runId: "post-fix", hypothesisId: "D", location: "install-prompt.tsx:bip", message: "beforeinstallprompt fired", data: { path: window.location.pathname }, timestamp: Date.now() }) }).catch(() => {});
+      // #endregion
+    };
+    const onEarlyPrompt = () => {
+      if (window.__sopInstallPrompt) acceptPrompt(window.__sopInstallPrompt);
+    };
     window.addEventListener("beforeinstallprompt", onBip);
+    window.addEventListener("sop:install-ready", onEarlyPrompt);
+    onEarlyPrompt();
 
     if ("serviceWorker" in navigator) {
-      void navigator.serviceWorker.register("/sw.js").catch(() => {});
+      void navigator.serviceWorker.register("/sw.js").then((registration) => {
+        // #region agent log
+        fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" }, body: JSON.stringify({ sessionId: "ffc48a", runId: "pre-fix-2", hypothesisId: "D", location: "install-prompt.tsx:sw", message: "service worker registered", data: { scope: registration.scope, active: Boolean(registration.active), controller: Boolean(navigator.serviceWorker.controller) }, timestamp: Date.now() }) }).catch(() => {});
+        // #endregion
+      }).catch((error: unknown) => {
+        // #region agent log
+        fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" }, body: JSON.stringify({ sessionId: "ffc48a", runId: "pre-fix-2", hypothesisId: "D", location: "install-prompt.tsx:sw-error", message: "service worker failed", data: { error: String(error) }, timestamp: Date.now() }) }).catch(() => {});
+        // #endregion
+      });
     }
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBip);
+      window.removeEventListener("sop:install-ready", onEarlyPrompt);
     };
   }, []);
 
@@ -110,6 +114,11 @@ export function InstallPrompt() {
       return;
     }
     document.documentElement.style.setProperty("--install-banner-h", "58px");
+    const banner = document.querySelector(".install-prompt");
+    const style = banner ? window.getComputedStyle(banner) : null;
+    // #region agent log
+    fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", { method: "POST", headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" }, body: JSON.stringify({ sessionId: "ffc48a", runId: "pre-fix-2", hypothesisId: "E", location: "install-prompt.tsx:visible", message: "banner visible effect", data: { hasBanner: Boolean(banner), display: style?.display ?? null, visibility: style?.visibility ?? null, opacity: style?.opacity ?? null, zIndex: style?.zIndex ?? null, htmlClass: document.documentElement.className }, timestamp: Date.now() }) }).catch(() => {});
+    // #endregion
     return () => {
       document.documentElement.style.removeProperty("--install-banner-h");
     };
@@ -118,18 +127,21 @@ export function InstallPrompt() {
   if (!visible || isStandalone()) return null;
 
   async function onInstall() {
-    if (!deferred) return;
+    if (!deferred) {
+      setShowInstallHelp(true);
+      return;
+    }
     setInstalling(true);
     try {
       await deferred.prompt();
       const choice = await deferred.userChoice;
       if (choice.outcome === "accepted") {
         setVisible(false);
-        dismiss();
       }
     } finally {
       setInstalling(false);
       setDeferred(null);
+      delete window.__sopInstallPrompt;
     }
   }
 
@@ -172,9 +184,12 @@ export function InstallPrompt() {
               {installing ? "…" : "İndir"}
             </Button>
           ) : (
-            <span className="rounded-full bg-white/12 px-2.5 py-1.5 text-[11px] font-semibold text-white/90 ring-1 ring-white/15">
-              {isIos ? "Paylaş → Ekle" : "Menü → Yükle"}
-            </span>
+            <Button
+              className="!border-0 !bg-white !px-3.5 !py-2 !text-[12px] !text-[#16352E] shadow-sm hover:!bg-white/90"
+              onClick={() => void onInstall()}
+            >
+              Yükle
+            </Button>
           )}
           <button
             type="button"
@@ -182,13 +197,19 @@ export function InstallPrompt() {
             aria-label="Kapat"
             onClick={() => {
               setVisible(false);
-              dismiss();
             }}
           >
             ×
           </button>
         </div>
       </div>
+      {showInstallHelp && !deferred && (
+        <div className="border-t border-white/15 bg-black/10 px-4 py-2 text-center text-[11px] font-medium text-white/90">
+          {isIos
+            ? "Safari: Paylaş simgesi → Ana Ekrana Ekle"
+            : "Tarayıcı menüsü (⋮) → Uygulamayı yükle veya Ana ekrana ekle"}
+        </div>
+      )}
     </div>
   );
 }

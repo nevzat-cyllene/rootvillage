@@ -55,6 +55,14 @@ export default async function RootLayout({
 
   return (
     <html lang="tr" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__sopInstallPrompt=e;window.dispatchEvent(new Event('sop:install-ready'));});",
+          }}
+        />
+      </head>
       <body className="min-h-dvh overflow-x-clip font-sans antialiased">
         <LocaleProvider>
           <AuthProvider initialUser={user} initialProfile={profile}>
