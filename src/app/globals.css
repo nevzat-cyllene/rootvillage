@@ -435,10 +435,10 @@ html[data-standalone] .install-prompt {
   display: none !important;
 }
 
-/* Hide on true desktop mouse layouts; phones/tablets keep it.
-   ?install=1 sets html[data-force-install] to always show. */
+/* Hide on true desktop mouse layouts unless phone/touch/BIP unlocked
+   the surface (data-show-install) or ?install=1. */
 @media (hover: hover) and (pointer: fine) and (min-width: 901px) {
-  html:not([data-force-install]) .install-prompt {
+  html:not([data-force-install]):not([data-show-install]) .install-prompt {
     display: none !important;
   }
 }

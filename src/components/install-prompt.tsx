@@ -43,6 +43,57 @@ function detectIos(): boolean {
   );
 }
 
+/** Phone / tablet / desktop-site / installable — unlock CSS that hides pure desktop. */
+function shouldShowInstallSurface(hasBip: boolean): boolean {
+  if (typeof window === "undefined") return true;
+  if (isForcedInstall() || hasBip) return true;
+  const ua = window.navigator.userAgent;
+  if (/Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
+    return true;
+  }
+  if ((window.navigator.maxTouchPoints ?? 0) > 0) return true;
+  if (window.matchMedia("(pointer: coarse)").matches) return true;
+  if (window.matchMedia("(hover: none)").matches) return true;
+  if (window.matchMedia("(max-width: 900px)").matches || window.innerWidth <= 900) {
+    return true;
+  }
+  return false;
+}
+
+function markShowInstall(on: boolean) {
+  if (on) document.documentElement.setAttribute("data-show-install", "");
+  else document.documentElement.removeAttribute("data-show-install");
+}
+
+function dbgLog(
+  hypothesisId: string,
+  location: string,
+  message: string,
+  data: Record<string, unknown>,
+) {
+  // #region agent log
+  const payload = JSON.stringify({
+    sessionId: "ffc48a",
+    runId: "auto-banner-1",
+    hypothesisId,
+    location,
+    message,
+    data,
+    timestamp: Date.now(),
+  });
+  fetch("http://127.0.0.1:7762/ingest/a3a263e2-4994-425b-8858-1c3468f5f9c3", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "ffc48a" },
+    body: payload,
+  }).catch(() => {});
+  fetch("/api/debug-ingest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: payload,
+  }).catch(() => {});
+  // #endregion
+}
+
 export function InstallPrompt() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(true);
@@ -56,13 +107,39 @@ export function InstallPrompt() {
     const standalone = isStandalone();
     const forced = isForcedInstall();
     const ios = detectIos();
+    const hasBip = Boolean(window.__sopInstallPrompt);
+    const showSurface = shouldShowInstallSurface(hasBip);
     setIsIos(ios);
     if (ios) setShowInstallHelp(true);
 
     document.documentElement.toggleAttribute("data-force-install", forced);
+    markShowInstall(showSurface);
+
+    const cssWouldHideDesktop =
+      window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 901px)")
+        .matches &&
+      !forced &&
+      !showSurface;
+
+    dbgLog("H1_H2_H5", "install-prompt.tsx:mount", "auto banner gate", {
+      standalone,
+      forced,
+      showSurface,
+      hasBip,
+      cssWouldHideDesktop,
+      ua: window.navigator.userAgent.slice(0, 140),
+      innerWidth: window.innerWidth,
+      maxTouchPoints: window.navigator.maxTouchPoints,
+      coarse: window.matchMedia("(pointer: coarse)").matches,
+      fine: window.matchMedia("(pointer: fine)").matches,
+      hover: window.matchMedia("(hover: hover)").matches,
+      path: window.location.pathname + window.location.search,
+    });
+
     if (standalone) {
       document.documentElement.setAttribute("data-standalone", "1");
       setVisible(false);
+      dbgLog("H3", "install-prompt.tsx:standalone", "hidden standalone", {});
       return;
     }
     document.documentElement.removeAttribute("data-standalone");
@@ -70,8 +147,10 @@ export function InstallPrompt() {
 
     const acceptPrompt = (prompt: BeforeInstallPromptEvent) => {
       setDeferred(prompt);
+      markShowInstall(true);
       setVisible(true);
       setShowInstallHelp(false);
+      dbgLog("H5", "install-prompt.tsx:bip", "BIP accepted → show banner", {});
     };
     const onBip = (e: Event) => {
       e.preventDefault();
@@ -91,6 +170,19 @@ export function InstallPrompt() {
     if ("serviceWorker" in navigator) {
       void navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
+
+    // After paint: confirm computed visibility (H1 CSS hide)
+    requestAnimationFrame(() => {
+      const el = document.querySelector(".install-prompt");
+      const style = el ? window.getComputedStyle(el) : null;
+      dbgLog("H1", "install-prompt.tsx:paint", "computed banner style", {
+        hasEl: Boolean(el),
+        display: style?.display ?? null,
+        visibility: style?.visibility ?? null,
+        showAttr: document.documentElement.hasAttribute("data-show-install"),
+        forceAttr: document.documentElement.hasAttribute("data-force-install"),
+      });
+    });
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBip);
