@@ -102,9 +102,10 @@ export async function getVillageBySlug(slug: string): Promise<Village | null> {
 
 export async function getFamiliesByVillage(villageId: string): Promise<Family[]> {
   const supabase = await createClient();
+  // Disambiguate after founder_person_id FK (008): people!family_id, not founder.
   const { data, error } = await supabase
     .from("families")
-    .select("*, people(count)")
+    .select("*, people!family_id(count)")
     .eq("village_id", villageId)
     .is("deleted_at", null)
     .order("name", { ascending: true });

@@ -430,13 +430,7 @@ html.atlas-immersive main {
   margin: 0;
 }
 
-html.atlas-immersive .install-prompt {
-  display: none;
-}
-
-html.kinship-immersive .install-prompt {
-  display: none;
-}
+/* Install banner stays visible above immersive atlas/kinship (z-60 > atlas z-25). */
 
 /* Push sticky header below the install invite banner */
 header.sticky {

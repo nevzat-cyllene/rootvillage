@@ -9,8 +9,10 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
-const DISMISS_KEY = "sop-install-dismissed-at";
-const DISMISS_MS = 7 * 24 * 60 * 60 * 1000;
+/** Bump when invite behavior changes so old dismissals don't stick. */
+const DISMISS_KEY = "sop-install-dismissed-at-v3";
+const DISMISS_MS = 2 * 24 * 60 * 60 * 1000;
+const LEGACY_DISMISS_KEYS = ["sop-install-dismissed-at", "sop-install-dismissed-at-v2"];
 
 function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
@@ -21,15 +23,32 @@ function isStandalone(): boolean {
   );
 }
 
-/** Phone/tablet only — never show the install invite on desktop. */
+/** Phone/tablet only — never show on desktop mouse layouts. */
 function isMobileClient(): boolean {
   if (typeof window === "undefined") return false;
   const ua = window.navigator.userAgent.toLowerCase();
-  return /android|iphone|ipad|ipod|webos|blackberry|iemobile|opera mini|mobile/.test(ua);
+  if (/android|iphone|ipad|ipod|webos|blackberry|iemobile|opera mini|mobile/.test(ua)) {
+    return true;
+  }
+  // iPadOS 13+ desktop UA
+  if (
+    window.navigator.platform === "MacIntel" &&
+    (window.navigator.maxTouchPoints ?? 0) > 1
+  ) {
+    return true;
+  }
+  // Touch phone/tablet without "Mobile" in UA
+  return (
+    window.matchMedia("(pointer: coarse)").matches &&
+    window.matchMedia("(max-width: 900px)").matches
+  );
 }
 
 function wasDismissedRecently(): boolean {
   try {
+    for (const key of LEGACY_DISMISS_KEYS) {
+      localStorage.removeItem(key);
+    }
     const raw = localStorage.getItem(DISMISS_KEY);
     if (!raw) return false;
     const at = Number(raw);
@@ -56,11 +75,18 @@ export function InstallPrompt() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!isMobileClient() || isStandalone() || wasDismissedRecently()) return;
+    if (isStandalone() || wasDismissedRecently()) return;
+    if (!isMobileClient()) return;
 
     const ua = window.navigator.userAgent.toLowerCase();
-    const ios = /iphone|ipad|ipod/.test(ua);
+    const ios =
+      /iphone|ipad|ipod/.test(ua) ||
+      (window.navigator.platform === "MacIntel" &&
+        (window.navigator.maxTouchPoints ?? 0) > 1);
     setIsIos(ios);
+
+    // Show immediately on mobile — do not wait for beforeinstallprompt.
+    setVisible(true);
 
     const onBip = (e: Event) => {
       e.preventDefault();
@@ -73,14 +99,8 @@ export function InstallPrompt() {
       void navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
 
-    // Top invite on mobile even before BIP.
-    const timer = window.setTimeout(() => {
-      if (!isStandalone()) setVisible(true);
-    }, 900);
-
     return () => {
       window.removeEventListener("beforeinstallprompt", onBip);
-      window.clearTimeout(timer);
     };
   }, []);
 
@@ -118,7 +138,7 @@ export function InstallPrompt() {
       role="dialog"
       aria-label="Uygulamayı yükle"
       className={cn(
-        "install-prompt fixed inset-x-0 top-0 z-[60]",
+        "install-prompt fixed inset-x-0 top-0 z-[80]",
         "border-b border-white/40 bg-[linear-gradient(105deg,#0F2A24_0%,#1A4A3E_42%,#243B55_100%)]",
         "pt-[env(safe-area-inset-top)] shadow-[0_12px_40px_rgba(15,42,36,0.28)]",
       )}
@@ -151,13 +171,9 @@ export function InstallPrompt() {
             >
               {installing ? "…" : "İndir"}
             </Button>
-          ) : isIos ? (
-            <span className="hidden rounded-full bg-white/12 px-2.5 py-1.5 text-[11px] font-semibold text-white/90 ring-1 ring-white/15 sm:inline">
-              Paylaş → Ekle
-            </span>
           ) : (
-            <span className="hidden rounded-full bg-white/12 px-2.5 py-1.5 text-[11px] font-semibold text-white/90 ring-1 ring-white/15 sm:inline">
-              Menü → Yükle
+            <span className="rounded-full bg-white/12 px-2.5 py-1.5 text-[11px] font-semibold text-white/90 ring-1 ring-white/15">
+              {isIos ? "Paylaş → Ekle" : "Menü → Yükle"}
             </span>
           )}
           <button

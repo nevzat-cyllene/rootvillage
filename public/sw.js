@@ -1,4 +1,4 @@
-const CACHE = "sop-shell-v2";
+const CACHE = "sop-shell-v3";
 const SHELL = ["/", "/villages", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
