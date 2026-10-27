@@ -21,6 +21,13 @@ function isStandalone(): boolean {
   );
 }
 
+/** Phone/tablet only — never show the install invite on desktop. */
+function isMobileClient(): boolean {
+  if (typeof window === "undefined") return false;
+  const ua = window.navigator.userAgent.toLowerCase();
+  return /android|iphone|ipad|ipod|webos|blackberry|iemobile|opera mini|mobile/.test(ua);
+}
+
 function wasDismissedRecently(): boolean {
   try {
     const raw = localStorage.getItem(DISMISS_KEY);
@@ -49,7 +56,7 @@ export function InstallPrompt() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (isStandalone() || wasDismissedRecently()) return;
+    if (!isMobileClient() || isStandalone() || wasDismissedRecently()) return;
 
     const ua = window.navigator.userAgent.toLowerCase();
     const ios = /iphone|ipad|ipod/.test(ua);
@@ -66,7 +73,7 @@ export function InstallPrompt() {
       void navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
 
-    // Premium top invite: show quickly on mobile/desktop even before BIP.
+    // Top invite on mobile even before BIP.
     const timer = window.setTimeout(() => {
       if (!isStandalone()) setVisible(true);
     }, 900);
