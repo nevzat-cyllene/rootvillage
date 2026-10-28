@@ -1,10 +1,11 @@
 "use client";
 
 import { CreateFamilyForm } from "@/components/create-family-form";
-import { VillageAtlasLazy } from "@/components/village-atlas/VillageAtlasLazy";
+import { FamilyTreeLazy } from "@/components/family-tree/FamilyTreeLazy";
+import { TreeAccessGate } from "@/components/tree-access-gate";
 import { Badge, Button, EmptyState, Surface } from "@/components/ui";
 import { peekAuthDraftResume } from "@/lib/auth-draft";
-import type { Family } from "@/lib/types";
+import type { Family, Person, PersonRelation, TreeAccess } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -17,16 +18,29 @@ export function VillageWorkspace({
   villageName,
   villageTurkishName,
   families,
+  people,
+  relations,
+  treeAccess,
+  canManageTree,
+  canEditTree,
 }: {
   villageId: string;
   villageName: string;
   villageTurkishName?: string | null;
   families: Family[];
+  people: Person[];
+  relations: PersonRelation[];
+  treeAccess: TreeAccess | null;
+  /** Owner/admin: can approve access, delete, etc. */
+  canManageTree: boolean;
+  /** Admin or approved contributor: can add people, relations and families. */
+  canEditTree: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>("atlas");
   const [createOpen, setCreateOpen] = useState(false);
+  const canAccessTree = canManageTree || treeAccess?.status === "approved";
 
   // Re-open create sheet after auth redirect, or when ?yeni=1
   useEffect(() => {
@@ -71,17 +85,17 @@ export function VillageWorkspace({
           </button>
         ))}
       </div>
-      <Button
+      {canEditTree && <Button
         type="button"
         className="relative z-30 !bg-[#236B5B] !px-3.5 !py-2 text-[12px] shadow-[0_8px_24px_rgba(35,107,91,0.22)] hover:!bg-[#195849]"
         onClick={() => setCreateOpen(true)}
       >
         <span aria-hidden>＋</span> Yeni aile
-      </Button>
+      </Button>}
     </div>
   );
 
-  const createDialog = createOpen ? (
+  const createDialog = canEditTree && createOpen ? (
     <div
       className="fixed inset-0 z-[80] flex items-end justify-center bg-[#0B1220]/45 p-3 backdrop-blur-md sm:items-center sm:p-6"
       role="dialog"
@@ -95,9 +109,10 @@ export function VillageWorkspace({
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#236B5B]">Yeni ocak</p>
-            <h2 className="mt-1 text-[24px] font-semibold tracking-[-0.04em]">Atlasa bir aile ekle</h2>
+            <h2 className="mt-1 text-[24px] font-semibold tracking-[-0.04em]">Soy ağacına bir aile ekle</h2>
             <p className="mt-2 text-[13px] leading-relaxed text-text-secondary">
-              Önce temel görünür. Kişiler ve nesiller bağlandıkça ev, ağaç ve yerleşke gelişir.
+              Aile ağaçta boş bir kök olarak belirir. İlk eklediğin kişi kurucu olur; eşi, çocukları ve
+              torunları onun altında dallanır.
             </p>
           </div>
           <button
@@ -111,20 +126,28 @@ export function VillageWorkspace({
         </div>
         <CreateFamilyForm
           villageId={villageId}
+          stayOnPage={tab === "atlas"}
           onCreated={() => setCreateOpen(false)}
         />
       </div>
     </div>
   ) : null;
 
+  if (!canAccessTree) {
+    return <TreeAccessGate villageId={villageId} villageName={villageName} access={treeAccess} />;
+  }
+
   if (tab === "atlas") {
     return (
       <>
-        <VillageAtlasLazy
+        <FamilyTreeLazy
           villageId={villageId}
           villageName={villageName}
           villageAlternateName={villageTurkishName}
           families={families}
+          people={people}
+          relations={relations}
+          canEdit={canEditTree}
           fullscreen
           topSlot={tabs}
         />
@@ -177,13 +200,13 @@ export function VillageWorkspace({
         </ul>
       )}
 
-      <Surface className="mb-4">
+      {canEditTree && <Surface className="mb-4">
         <h2 className="mb-1 text-[18px] font-semibold tracking-[-0.02em]">Yeni aile</h2>
         <p className="mb-4 text-[13px] text-text-secondary">
-          Kısa bir aile adı verin; atlas üzerinde yeni bir ada olarak görünür.
+          Kısa bir aile adı verin; soy ağacında yeni bir kök olarak görünür.
         </p>
         <CreateFamilyForm villageId={villageId} />
-      </Surface>
+      </Surface>}
       {createDialog}
     </div>
   );

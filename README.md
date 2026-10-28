@@ -21,7 +21,7 @@ cp .env.example .env.local
 Supabase Dashboard → SQL Editor → sırayla çalıştır:
 
 1. `supabase/migrations/001_init.sql`
-2. `supabase/migrations/002_clan_atlas.sql` (atlas ada konumları)
+2. `supabase/migrations/002_clan_atlas.sql` (eski 3D atlas konum sütunları; artık kullanılmıyor, geriye dönük uyumluluk için kalır)
 3. `supabase/migrations/002_profile_name_meta.sql` (profil adı meta verisi)
 4. `supabase/migrations/003_person_avatar.sql` (kişi foto + storage bucket)
 5. `supabase/migrations/004_heritage_archive.sql` (hafıza arşivi + çift adlı köyler)
@@ -29,6 +29,13 @@ Supabase Dashboard → SQL Editor → sırayla çalıştır:
 7. `supabase/migrations/006_heritage_comments.sql` (arşiv kayıtlarına tanıklık ve kaynak notu yorumları)
 8. `supabase/migrations/007_person_generation.sql` (kişinin düzeltilebilir nesil numarası)
 9. `supabase/migrations/008_family_founder.sql` (aile kurucusu + kişi/ilişki/aile verisini sıfırlar; köyler kalır)
+
+10. `supabase/migrations/009_private_family_trees.sql` (özel soy ağacı erişimi, yönetici sabitleme ve katkı onayı)
+11. `supabase/migrations/010_contributor_tree_writes.sql` (onaylı katkıcılar soy ağacı tuvalinden doğrudan kişi/bağ/aile ekleyebilir)
+
+### Soy ağacı tuvali (Atlas sekmesi)
+
+Köy sayfasındaki **Atlas** sekmesi klasik çizgili soy ağacıdır: her aile ayrı bir kök, nesiller satır satır hizalı, eşler yan yana (evlilik çizgisi), çocuklar ortak bir "bara"dan iner. Kartlar cinsiyete göre renklenir (mavi erkek, gül kadın) ve seçilen referans kişiye göre akrabalık etiketi taşır. Yerleşim `src/lib/pedigree/layout.ts` (ev-birimi tabanlı tidy-tree, d3-hierarchy), akrabalık hesabı `src/lib/pedigree/kinship.ts`. Köyde hiç kişi yokken örnek bir ağaç önizlenir; katkıcılar tek tıkla köye yükleyebilir.
 
 ### 2) Google Auth
 
@@ -41,13 +48,9 @@ Detay: `docs/GOOGLE_AUTH_SETUP.md`
   `https://rootvillage.vercel.app/auth/callback`
 - Providers → Google → Client ID/Secret yapıştır
 
-### 3) İlk admin
+### 3) Özel soy ağacı erişimi
 
-Google ile bir kez giriş yap, sonra SQL:
-
-```sql
-update public.profiles set role = 'admin' where id = 'SENIN_USER_UUID';
-```
+`009_private_family_trees.sql` uygulandığında yönetici yalnızca `nevzatkyak5@gmail.com` hesabıdır. Köy sayfaları herkese görünür; soy ağacı açılmak istendiğinde kullanıcı giriş yapar ve erişim talebi gönderir. Yönetim ekranından talebi görüntüleme veya katkı önerisi yetkisiyle onaylayabilirsin.
 
 ### 4) Geliştirme
 

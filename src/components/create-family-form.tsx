@@ -17,9 +17,12 @@ type FamilyDraft = {
 export function CreateFamilyForm({
   villageId,
   onCreated,
+  stayOnPage = false,
 }: {
   villageId: string;
   onCreated?: (familyId: string) => void;
+  /** Keep the user on the current page (e.g. the tree canvas) instead of opening the family page. */
+  stayOnPage?: boolean;
 }) {
   const draftKey = `create-family:${villageId}`;
   const { user, loading: authLoading, requireAuth } = useAuth();
@@ -93,7 +96,13 @@ export function CreateFamilyForm({
     setNotes("");
     setRestoredNotice(false);
     onCreated?.(row.id);
-    // Always land on the family page so the founder can be added next.
+    if (stayOnPage) {
+      // The tree canvas shows the new family as an empty root with a
+      // "Kurucuyu ekle" placeholder after refresh.
+      router.refresh();
+      return;
+    }
+    // Otherwise land on the family page so the founder can be added next.
     router.push(`/family/${row.id}`);
     router.refresh();
   }

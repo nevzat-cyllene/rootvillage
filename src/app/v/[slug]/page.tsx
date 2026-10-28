@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { VillageWorkspace } from "@/components/village-workspace";
-import { getFamiliesByVillage, getVillageBySlug } from "@/lib/data";
+import { getCurrentProfile, getTreeAccess, getVillageBySlug, getVillageTreeData } from "@/lib/data";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,14 @@ export default async function VillagePage({
   const village = await getVillageBySlug(slug);
   if (!village) notFound();
 
-  const families = await getFamiliesByVillage(village.id);
+  const profile = await getCurrentProfile();
+  const [tree, treeAccess] = await Promise.all([
+    getVillageTreeData(village.id),
+    getTreeAccess(village.id),
+  ]);
+  const isAdmin = profile?.role === "admin";
+  const canEditTree =
+    isAdmin || (treeAccess?.status === "approved" && treeAccess.role === "contributor");
 
   return (
     <Suspense fallback={<div className="p-6 text-[13px] text-text-secondary">Köy yükleniyor…</div>}>
@@ -36,7 +43,12 @@ export default async function VillagePage({
         villageId={village.id}
         villageName={village.name}
         villageTurkishName={village.name_tr}
-        families={families}
+        families={tree.families}
+        people={tree.people}
+        relations={tree.relations}
+        treeAccess={treeAccess}
+        canManageTree={isAdmin}
+        canEditTree={canEditTree}
       />
     </Suspense>
   );

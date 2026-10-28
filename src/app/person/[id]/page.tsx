@@ -10,9 +10,11 @@ import { ShareButton } from "@/components/share-button";
 import { Badge, PageHeader, Surface } from "@/components/ui";
 import {
   getComments,
+  getCurrentProfile,
   getFamilyById,
   getPersonById,
   getRelationshipGraph,
+  getTreeAccess,
 } from "@/lib/data";
 import {
   generationKinLabel,
@@ -44,6 +46,12 @@ export default async function PersonPage({
   if (!person) notFound();
 
   const family = await getFamilyById(person.family_id);
+  const [profile, treeAccess] = await Promise.all([
+    getCurrentProfile(),
+    family ? getTreeAccess(family.village_id) : Promise.resolve(null),
+  ]);
+  const isAdmin = profile?.role === "admin";
+  const canPropose = isAdmin || (treeAccess?.status === "approved" && treeAccess.role === "contributor");
   const relationshipGraph = await getRelationshipGraph([person]);
   const people = relationshipGraph.people;
   const relations = relationshipGraph.relations;
@@ -83,8 +91,8 @@ export default async function PersonPage({
               title={`${person.full_name} · Şop`}
               text={`${person.full_name} hakkında Şop kaydı`}
             />
-            <DisputeToggle table="people" id={person.id} disputed={person.disputed} />
-            <SoftDeleteButton table="people" id={person.id} />
+            {isAdmin && <DisputeToggle table="people" id={person.id} disputed={person.disputed} />}
+            {canPropose && <SoftDeleteButton table="people" id={person.id} />}
           </>
         }
       />
@@ -101,7 +109,7 @@ export default async function PersonPage({
           {person.notes || "Henüz not yok. Düzenle ile ekleyebilirsin."}
         </p>
         <div className="mt-4">
-          <EditPersonQuick person={person} />
+          {canPropose && <EditPersonQuick person={person} canPropose />}
         </div>
       </Surface>
 
@@ -143,11 +151,11 @@ export default async function PersonPage({
         </Surface>
       )}
 
-      <CommentsPanel
+      {canPropose && <CommentsPanel
         targetType="person"
         targetId={person.id}
         initialComments={comments}
-      />
+      />}
     </div>
   );
 }

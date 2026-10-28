@@ -214,7 +214,7 @@ export function CreatePersonForm({
   );
 }
 
-export function EditPersonQuick({ person }: { person: Person }) {
+export function EditPersonQuick({ person, canPropose = false }: { person: Person; canPropose?: boolean }) {
   const draftKey = `edit-person:${person.id}`;
   const { user, requireAuth, profile } = useAuth();
   const router = useRouter();
@@ -275,8 +275,9 @@ export function EditPersonQuick({ person }: { person: Person }) {
           : null,
     };
 
-    await supabase.from("people").update(payload).eq("id", person.id);
-    if (profile?.role !== "admin" && data.fullName.trim() !== person.full_name) {
+    if (profile?.role === "admin") {
+      await supabase.from("people").update(payload).eq("id", person.id);
+    } else if (canPropose) {
       await supabase.from("edit_proposals").insert({
         target_type: "person",
         target_id: person.id,
@@ -284,9 +285,6 @@ export function EditPersonQuick({ person }: { person: Person }) {
         payload,
         reason: "Kişi bilgisi güncellemesi",
         proposed_by: u.id,
-        status: "accepted",
-        resolved_by: u.id,
-        resolved_at: new Date().toISOString(),
       });
     }
 
@@ -312,6 +310,8 @@ export function EditPersonQuick({ person }: { person: Person }) {
     clearAuthDraft(draftKey);
     await performSave(data);
   }
+
+  if (!canPropose && profile?.role !== "admin") return null;
 
   if (!open) {
     return (

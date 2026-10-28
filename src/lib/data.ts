@@ -9,6 +9,8 @@ import type {
   PersonRelation,
   Profile,
   Village,
+  VillageTreeData,
+  TreeAccess,
 } from "@/lib/types";
 
 export async function getVillages(query?: string): Promise<Village[]> {
@@ -134,7 +136,7 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
 
   const { data: peopleRows, error: peopleError } = await supabase
     .from("people")
-    .select("id, family_id, full_name")
+    .select("id, family_id")
     .in("family_id", familyIds)
     .is("deleted_at", null);
 
@@ -142,89 +144,24 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
     return families.map((family) => ({
       ...family,
       generation_count: (family.people_count ?? 0) > 0 ? 1 : 0,
-      offspring_family_ids: [],
-      child_people: [],
-      children_by_person: {},
+      is_incomplete: family.is_incomplete || !family.founder_person_id,
     }));
   }
 
   const personIds = peopleRows.map((person) => person.id);
-  const familyByPerson = new Map(peopleRows.map((person) => [person.id, person.family_id]));
-  const nameByPerson = new Map(peopleRows.map((person) => [person.id, person.full_name as string]));
   const { data: relationRows } = await supabase
     .from("person_relations")
     .select("person_id, related_person_id, relation_type")
-    .or(`person_id.in.(${personIds.join(",")}),related_person_id.in.(${personIds.join(",")})`)
+    .eq("relation_type", "parent")
+    .in("related_person_id", personIds)
     .is("deleted_at", null);
 
-  const familyLinkCounts = new Map<string, number>();
-  /** parentFamilyId → child family ids (cross-family only) */
-  const offspringByFamily = new Map<string, Set<string>>();
-  /** parentPersonId → direct children (deduped) */
-  const childrenByPersonMaps = new Map<
-    string,
-    Map<string, { id: string; full_name: string }>
-  >();
-
+  /** parentPersonId → direct children */
+  const childrenByPerson = new Map<string, Set<string>>();
   for (const relation of relationRows ?? []) {
-    const personFamily = familyByPerson.get(relation.person_id);
-    const relatedFamily = familyByPerson.get(relation.related_person_id);
-    if (personFamily && relatedFamily && personFamily !== relatedFamily) {
-      const [left, right] = [personFamily, relatedFamily].sort();
-      const key = `${left}:${right}`;
-      familyLinkCounts.set(key, (familyLinkCounts.get(key) ?? 0) + 1);
-    }
-
-    if (relation.relation_type !== "parent") continue;
-
-    // person_id = child, related_person_id = parent
-    const childId = relation.person_id;
-    const parentId = relation.related_person_id;
-    const childFamily = familyByPerson.get(childId);
-    const parentFamily = familyByPerson.get(parentId);
-    if (!childFamily || !parentFamily) continue;
-
-    const childName = nameByPerson.get(childId);
-    if (childName) {
-      const personBucket = childrenByPersonMaps.get(parentId) ?? new Map();
-      personBucket.set(childId, { id: childId, full_name: childName });
-      childrenByPersonMaps.set(parentId, personBucket);
-    }
-
-    if (childFamily !== parentFamily) {
-      const set = offspringByFamily.get(parentFamily) ?? new Set();
-      set.add(childFamily);
-      offspringByFamily.set(parentFamily, set);
-    }
-  }
-
-  const childrenByPerson: Record<string, Array<{ id: string; full_name: string }>> = {};
-  for (const [parentId, kids] of childrenByPersonMaps) {
-    childrenByPerson[parentId] = [...kids.values()];
-  }
-
-  /**
-   * Atlas bloom: only direct children of families.founder_person_id.
-   */
-  const founderChildrenByFamily = new Map<
-    string,
-    Map<string, { id: string; full_name: string; family_id: string }>
-  >();
-  for (const family of families) {
-    const bucket = new Map<string, { id: string; full_name: string; family_id: string }>();
-    const founderId = family.founder_person_id;
-    if (founderId) {
-      for (const child of childrenByPersonMaps.get(founderId)?.values() ?? []) {
-        const childFamily = familyByPerson.get(child.id);
-        if (!childFamily) continue;
-        bucket.set(child.id, {
-          id: child.id,
-          full_name: child.full_name,
-          family_id: childFamily,
-        });
-      }
-    }
-    founderChildrenByFamily.set(family.id, bucket);
+    const bucket = childrenByPerson.get(relation.related_person_id) ?? new Set<string>();
+    bucket.add(relation.person_id);
+    childrenByPerson.set(relation.related_person_id, bucket);
   }
 
   /** Max generation depth from founder down (BFS). */
@@ -236,68 +173,67 @@ export async function getFamiliesByVillage(villageId: string): Promise<Family[]>
     while (queue.length > 0) {
       const current = queue.shift()!;
       const d = depth.get(current) ?? 1;
-      for (const child of childrenByPersonMaps.get(current)?.values() ?? []) {
-        if (depth.has(child.id)) continue;
+      for (const childId of childrenByPerson.get(current) ?? []) {
+        if (depth.has(childId)) continue;
         const next = d + 1;
-        depth.set(child.id, next);
+        depth.set(childId, next);
         if (next > max) max = next;
-        queue.push(child.id);
+        queue.push(childId);
       }
     }
     return max;
   };
 
-  const clusterParent = new Map(familyIds.map((id) => [id, id]));
-  const findCluster = (id: string): string => {
-    const parent = clusterParent.get(id) ?? id;
-    if (parent === id) return id;
-    const root = findCluster(parent);
-    clusterParent.set(id, root);
-    return root;
-  };
-  const unionCluster = (left: string, right: string) => {
-    const leftRoot = findCluster(left);
-    const rightRoot = findCluster(right);
-    if (leftRoot !== rightRoot) clusterParent.set(rightRoot, leftRoot);
-  };
-
-  for (const [key, strength] of familyLinkCounts) {
-    if (strength < 2) continue;
-    const [left, right] = key.split(":");
-    if (left && right) unionCluster(left, right);
-  }
-
-  const clusterRoots = [...new Set(
-    familyIds
-      .map((id) => findCluster(id))
-      .filter((root) => familyIds.filter((id) => findCluster(id) === root).length > 1),
-  )];
-
   return families.map((family) => {
-    const familyPeople = peopleRows.filter((person) => person.family_id === family.id);
-    const kinshipLinks = [...familyLinkCounts.entries()].flatMap(([key, strength]) => {
-      const [left, right] = key.split(":");
-      if (left === family.id && right) return [{ family_id: right, strength }];
-      if (right === family.id && left) return [{ family_id: left, strength }];
-      return [];
-    });
-    const root = findCluster(family.id);
     const hasFounder = Boolean(family.founder_person_id);
     return {
       ...family,
-      generation_count: familyPeople.length === 0
+      generation_count: (family.people_count ?? 0) === 0
         ? 0
         : hasFounder
           ? generationCountFromFounder(family.founder_person_id)
           : 1,
-      kinship_cluster: clusterRoots.includes(root) ? clusterRoots.indexOf(root) : null,
-      kinship_links: kinshipLinks,
-      offspring_family_ids: [...(offspringByFamily.get(family.id) ?? [])],
-      child_people: [...(founderChildrenByFamily.get(family.id)?.values() ?? [])],
-      children_by_person: childrenByPerson,
       is_incomplete: family.is_incomplete || !hasFounder,
     };
   });
+}
+
+/**
+ * Full genealogy payload for the village pedigree canvas: every family, every
+ * person of those families, every relation touching them, and the relatives
+ * those relations point to (people who married in from other villages).
+ */
+export async function getVillageTreeData(villageId: string): Promise<VillageTreeData> {
+  const families = await getFamiliesByVillage(villageId);
+  const familyIds = families.map((family) => family.id);
+  if (familyIds.length === 0) return { families, people: [], relations: [] };
+
+  const supabase = await createClient();
+  const { data: peopleRows, error: peopleError } = await supabase
+    .from("people")
+    .select("*")
+    .in("family_id", familyIds)
+    .is("deleted_at", null)
+    .order("birth_year", { ascending: true, nullsFirst: false });
+
+  if (peopleError) {
+    console.error("getVillageTreeData.people", peopleError.message);
+    return { families, people: [], relations: [] };
+  }
+
+  const people = (peopleRows ?? []) as Person[];
+  if (people.length === 0) return { families, people, relations: [] };
+
+  const relations = await getRelationsForPeople(people.map((person) => person.id));
+  const known = new Set(people.map((person) => person.id));
+  const missing = new Set<string>();
+  for (const relation of relations) {
+    if (!known.has(relation.person_id)) missing.add(relation.person_id);
+    if (!known.has(relation.related_person_id)) missing.add(relation.related_person_id);
+  }
+  const outsiders = await getPeopleByIds([...missing]);
+
+  return { families, people: [...people, ...outsiders], relations };
 }
 
 export async function getFamilyById(id: string): Promise<Family | null> {
@@ -450,6 +386,34 @@ export async function getCurrentProfile(): Promise<Profile | null> {
     avatar_url: user.user_metadata?.avatar_url ?? null,
     role: "member",
   };
+}
+
+export async function getTreeAccess(villageId: string): Promise<TreeAccess | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await supabase
+    .from("tree_access")
+    .select("*")
+    .eq("village_id", villageId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return data as TreeAccess | null;
+}
+
+export async function getPendingTreeAccessRequests(): Promise<TreeAccess[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tree_access")
+    .select("*, profile:profiles(display_name, avatar_url), village:villages(name, slug)")
+    .eq("status", "pending")
+    .order("requested_at", { ascending: false });
+  if (error) {
+    console.error("getPendingTreeAccessRequests", error.message);
+    return [];
+  }
+  return (data ?? []) as TreeAccess[];
 }
 
 export async function getPendingProposals(): Promise<EditProposal[]> {

@@ -67,7 +67,7 @@ export type Family = {
   map_x?: number | null;
   map_z?: number | null;
   map_seed?: number | null;
-  /** Root person for generations + atlas bloom. */
+  /** Root person for generation numbering (1. nesil). */
   founder_person_id?: string | null;
   created_by: string | null;
   created_at: string;
@@ -75,17 +75,14 @@ export type Family = {
   deleted_at: string | null;
   people_count?: number;
   generation_count?: number;
-  kinship_cluster?: number | null;
-  kinship_links?: Array<{ family_id: string; strength: number }>;
-  /** Families founded by / containing direct children of people in this family. */
-  offspring_family_ids?: string[];
-  /** Direct children of founding members only (atlas bloom; not grandchildren). */
-  child_people?: Array<{ id: string; full_name: string; family_id: string }>;
-  /**
-   * Village-scoped map: parent person id → their direct children.
-   * Same object reference attached on every family from getFamiliesByVillage.
-   */
-  children_by_person?: Record<string, Array<{ id: string; full_name: string }>>;
+};
+
+/** Everything the village pedigree canvas needs in one payload. */
+export type VillageTreeData = {
+  families: Family[];
+  /** People of the village's families plus relatives pulled in through relations. */
+  people: Person[];
+  relations: PersonRelation[];
 };
 
 export type Person = {
@@ -139,4 +136,21 @@ export type EditProposal = {
   resolved_by: string | null;
   created_at: string;
   resolved_at: string | null;
+};
+
+export type TreeAccessRole = "viewer" | "contributor";
+export type TreeAccessStatus = "pending" | "approved" | "rejected" | "revoked";
+
+export type TreeAccess = {
+  id: string;
+  village_id: string;
+  user_id: string;
+  role: TreeAccessRole;
+  status: TreeAccessStatus;
+  requested_at: string;
+  decided_at: string | null;
+  decided_by: string | null;
+  note: string | null;
+  profile?: Pick<Profile, "display_name" | "avatar_url"> | null;
+  village?: Pick<Village, "name" | "slug"> | null;
 };

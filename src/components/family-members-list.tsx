@@ -19,12 +19,14 @@ export function FamilyMembersList({
   people,
   relations,
   founderPersonId = null,
+  canPropose = false,
 }: {
   familyId: string;
   familyName: string;
   people: Person[];
   relations: PersonRelation[];
   founderPersonId?: string | null;
+  canPropose?: boolean;
 }) {
   const rows = useMemo(() => {
     const memo = new Map<string, number>();
@@ -156,9 +158,11 @@ export function FamilyMembersList({
                             >
                               {otherFamily ? "Kendi ailesine git" : "Aile kaydı"}
                             </Link>
-                            <div className="ml-auto opacity-70 transition group-hover:opacity-100">
-                              <EditPersonQuick person={person} />
-                            </div>
+                            {canPropose && (
+                              <div className="ml-auto opacity-70 transition group-hover:opacity-100">
+                                <EditPersonQuick person={person} canPropose />
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

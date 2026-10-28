@@ -265,10 +265,187 @@ select {
     var(--bg-surface);
 }
 
-/* Atlas canvas: prevent page scroll while interacting on mobile */
-.atlas-touch-lock {
+/* ------------------------------------------------------------------ */
+/* Pedigree (village family-tree canvas)                               */
+/* ------------------------------------------------------------------ */
+
+.pedigree-shell {
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(74, 139, 183, 0.10), transparent 55%),
+    radial-gradient(ellipse at 90% 100%, rgba(47, 146, 124, 0.10), transparent 55%),
+    #eef2f6;
+}
+
+.pedigree-stage {
   overscroll-behavior: none;
-  touch-action: none;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(60, 91, 120, 0.14) 1px, transparent 0);
+  background-size: 26px 26px;
+  cursor: grab;
+}
+.pedigree-stage:active {
+  cursor: grabbing;
+}
+
+/* Family frames */
+.pedigree-frame {
+  border-color: rgba(93, 116, 137, 0.16);
+  background: rgba(255, 255, 255, 0.28);
+}
+.pedigree-frame-active {
+  border-color: rgba(35, 107, 91, 0.45);
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: 0 0 0 6px rgba(35, 107, 91, 0.06);
+}
+.pedigree-frame-sample {
+  border-style: dashed;
+}
+.pedigree-frame-label {
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 6px 18px rgba(31, 57, 80, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+/* Cards */
+.pedigree-card {
+  background: linear-gradient(165deg, #ffffff 0%, #f6f9fb 100%);
+  border-color: rgba(93, 116, 137, 0.22);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 10px 26px rgba(31, 57, 80, 0.10),
+    0 2px 6px rgba(31, 57, 80, 0.06);
+}
+.pedigree-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 18px 40px rgba(31, 57, 80, 0.16),
+    0 2px 6px rgba(31, 57, 80, 0.06);
+}
+.pedigree-card-stripe {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 6px;
+  border-radius: 20px 20px 0 0;
+}
+.pedigree-card-male {
+  background: linear-gradient(165deg, #ffffff 0%, #eef5fd 100%);
+  border-color: rgba(47, 120, 189, 0.38);
+}
+.pedigree-card-male .pedigree-card-stripe {
+  background: linear-gradient(90deg, #2f78bd, #6aa7e6);
+}
+.pedigree-card-male .pedigree-kin-chip {
+  background: var(--gender-male-bg);
+  color: #1f5b96;
+}
+.pedigree-card-female {
+  background: linear-gradient(165deg, #ffffff 0%, #fdf0f5 100%);
+  border-color: rgba(189, 79, 120, 0.38);
+}
+.pedigree-card-female .pedigree-card-stripe {
+  background: linear-gradient(90deg, #bd4f78, #e68ab0);
+}
+.pedigree-card-female .pedigree-kin-chip {
+  background: var(--gender-female-bg);
+  color: #93355c;
+}
+.pedigree-card-neutral .pedigree-card-stripe {
+  background: linear-gradient(90deg, #8a96a3, #b7c0ca);
+}
+.pedigree-card-neutral .pedigree-kin-chip {
+  background: #e8ecf0;
+  color: #4b5a69;
+}
+.pedigree-card-ghost {
+  opacity: 0.78;
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: none;
+}
+.pedigree-card-ghost:hover {
+  opacity: 1;
+}
+.pedigree-card-selected {
+  border-color: #236b5b;
+  box-shadow:
+    0 0 0 4px rgba(35, 107, 91, 0.18),
+    0 22px 48px rgba(35, 107, 91, 0.22);
+}
+.pedigree-card-drop {
+  border-color: #236b5b;
+  border-style: solid;
+  box-shadow: 0 0 0 5px rgba(35, 107, 91, 0.28), 0 18px 40px rgba(35, 107, 91, 0.25);
+  animation: pedigree-drop-pulse 0.9s ease-in-out infinite;
+}
+.pedigree-card-dragging {
+  box-shadow: 0 30px 70px rgba(20, 40, 60, 0.32);
+  opacity: 0.92;
+  transition: none;
+}
+@keyframes pedigree-drop-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(35, 107, 91, 0.18), 0 18px 40px rgba(35, 107, 91, 0.2); }
+  50% { box-shadow: 0 0 0 9px rgba(35, 107, 91, 0.10), 0 18px 40px rgba(35, 107, 91, 0.3); }
+}
+
+.pedigree-placeholder {
+  border-color: rgba(93, 116, 137, 0.34);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.pedigree-halo-btn {
+  animation: kinship-pop 0.35s cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+
+/* Connectors */
+.pedigree-edge {
+  fill: none;
+  stroke: #7d8fa0;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.2s ease, opacity 0.2s ease, stroke-width 0.2s ease;
+}
+.pedigree-edge-union {
+  stroke: #c98a3d;
+  stroke-width: 3;
+}
+.pedigree-edge-union-informal {
+  stroke: #c98a3d;
+  stroke-width: 2.4;
+  stroke-dasharray: 6 6;
+}
+.pedigree-edge-cross {
+  stroke: #8fa0b0;
+  stroke-dasharray: 5 7;
+}
+.pedigree-edge-ghostlink {
+  stroke: #236b5b;
+  stroke-width: 2;
+  stroke-dasharray: 4 8;
+  opacity: 0.8;
+}
+.pedigree-edge-active {
+  stroke: #236b5b;
+  stroke-width: 3.6;
+}
+.pedigree-edge-muted {
+  opacity: 0.35;
+}
+
+/* Immersive tree: hide site chrome */
+html.tree-immersive,
+html.tree-immersive body {
+  overflow: hidden;
+  height: 100%;
+}
+html.tree-immersive header {
+  display: none;
+}
+html.tree-immersive main {
+  max-width: none;
+  padding: 0 !important;
+  margin: 0;
 }
 
 /* Kinship studio */
@@ -411,23 +588,6 @@ html.kinship-immersive header {
   .kinship-sheet-enter {
     animation: none !important;
   }
-}
-
-/* Immersive atlas: hide site chrome scroll chrome */
-html.atlas-immersive,
-html.atlas-immersive body {
-  overflow: hidden;
-  height: 100%;
-}
-
-html.atlas-immersive header {
-  display: none;
-}
-
-html.atlas-immersive main {
-  max-width: none;
-  padding: 0 !important;
-  margin: 0;
 }
 
 /* Push sticky header below the install invite banner */

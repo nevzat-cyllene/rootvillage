@@ -44,7 +44,17 @@ export function AdminProposals({ proposals }: { proposals: EditProposal[] }) {
           : proposal.target_type === "family"
             ? "families"
             : "people";
-      await supabase.from(table).update(proposal.payload).eq("id", proposal.target_id);
+      const allowedFields = proposal.target_type === "person"
+        ? ["full_name", "birth_year", "death_year", "gender", "notes", "avatar_url", "generation"]
+        : proposal.target_type === "family"
+          ? ["name", "aka", "notes", "is_incomplete", "disputed", "founder_person_id"]
+          : ["name", "name_tr", "description"];
+      const safePayload = Object.fromEntries(
+        Object.entries(proposal.payload).filter(([key]) => allowedFields.includes(key)),
+      );
+      if (Object.keys(safePayload).length > 0) {
+        await supabase.from(table).update(safePayload).eq("id", proposal.target_id);
+      }
     }
 
     await supabase

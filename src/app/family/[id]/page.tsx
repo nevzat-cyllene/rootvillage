@@ -12,9 +12,11 @@ import { ShareButton } from "@/components/share-button";
 import { Badge, EmptyState, PageHeader, Surface } from "@/components/ui";
 import {
   getComments,
+  getCurrentProfile,
   getFamilyById,
   getPeopleByFamily,
   getRelationshipGraph,
+  getTreeAccess,
 } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 
@@ -47,6 +49,12 @@ export default async function FamilyPage({
     .eq("id", family.village_id)
     .maybeSingle();
 
+  const [profile, treeAccess] = await Promise.all([
+    getCurrentProfile(),
+    getTreeAccess(family.village_id),
+  ]);
+  const isAdmin = profile?.role === "admin";
+  const canPropose = isAdmin || (treeAccess?.status === "approved" && treeAccess.role === "contributor");
   const people = await getPeopleByFamily(family.id);
   const relationshipGraph = await getRelationshipGraph(people);
   const relations = relationshipGraph.relations;
@@ -78,8 +86,8 @@ export default async function FamilyPage({
               text={`“${family.name}” aile kaydı · Şop`}
               label="Aileyi paylaş"
             />
-            <DisputeToggle table="families" id={family.id} disputed={family.disputed} />
-            <SoftDeleteButton table="families" id={family.id} />
+            {isAdmin && <DisputeToggle table="families" id={family.id} disputed={family.disputed} />}
+            {canPropose && <SoftDeleteButton table="families" id={family.id} />}
           </>
         }
       />
@@ -98,13 +106,13 @@ export default async function FamilyPage({
         <Badge>{people.length} kişi</Badge>
       </div>
 
-      <PersonRelationStudio
+      {isAdmin && <PersonRelationStudio
         familyId={family.id}
         people={relationshipGraph.people}
         homePeople={people}
         relations={relations}
         founderPersonId={family.founder_person_id}
-      />
+      />}
 
       {people.length === 0 ? (
         <EmptyState
@@ -118,22 +126,23 @@ export default async function FamilyPage({
           people={people}
           relations={relations}
           founderPersonId={family.founder_person_id}
+          canPropose={canPropose}
         />
       )}
 
-      <Surface className="mb-4">
+      {isAdmin && <Surface className="mb-4">
         <h2 className="mb-1 text-[18px] font-semibold tracking-[-0.02em]">Kişi ekle</h2>
         <p className="mb-4 text-[13px] text-text-secondary">
           İlk kişi kurucu sayılır. Atlas’ta yalnızca kurucunun çocukları açılır.
         </p>
         <CreatePersonForm familyId={family.id} people={people} />
-      </Surface>
+      </Surface>}
 
-      <CommentsPanel
+      {canPropose && <CommentsPanel
         targetType="family"
         targetId={family.id}
         initialComments={comments}
-      />
+      />}
     </div>
   );
 }
