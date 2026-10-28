@@ -1,7 +1,6 @@
 "use client";
 
 import { Badge, Button, EmptyState, Surface } from "@/components/ui";
-import { createClient } from "@/lib/supabase/client";
 import type { TreeAccess, TreeAccessRole } from "@/lib/types";
 import { relativeTime } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -13,15 +12,11 @@ export function TreeAccessRequests({ requests }: { requests: TreeAccess[] }) {
 
   async function decide(request: TreeAccess, status: "approved" | "rejected", role: TreeAccessRole = "viewer") {
     setBusyId(request.id);
-    const { data: { user } } = await createClient().auth.getUser();
-    if (user) {
-      await createClient().from("tree_access").update({
-        status,
-        role,
-        decided_at: new Date().toISOString(),
-        decided_by: user.id,
-      }).eq("id", request.id);
-    }
+    await fetch("/api/admin/tree-access", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: request.id, status, role }),
+    });
     setBusyId(null);
     router.refresh();
   }

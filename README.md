@@ -33,6 +33,7 @@ Supabase Dashboard → SQL Editor → sırayla çalıştır:
 10. `supabase/migrations/009_private_family_trees.sql` (özel soy ağacı erişimi, yönetici sabitleme ve katkı onayı)
 11. `supabase/migrations/010_contributor_tree_writes.sql` (onaylı katkıcılar soy ağacı tuvalinden doğrudan kişi/bağ/aile ekleyebilir)
 12. `supabase/migrations/011_admin_only_soft_delete.sql` (aile/kişi soft-delete yalnızca admin; katkıcılar silme önerisi gönderir)
+13. `supabase/migrations/012_tree_access_profile_fk.sql` (tree_access → profiles FK; admin talep listesi embed’i için)
 
 ### Soy ağacı tuvali (Atlas sekmesi)
 

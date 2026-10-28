@@ -1,4 +1,6 @@
+import { createServiceClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { getSupabaseSecretKey } from "@/lib/supabase/env";
 import type {
   Comment,
   CommentTarget,
@@ -403,17 +405,94 @@ export async function getTreeAccess(villageId: string): Promise<TreeAccess | nul
 }
 
 export async function getPendingTreeAccessRequests(): Promise<TreeAccess[]> {
-  const supabase = await createClient();
+  const profile = await getCurrentProfile();
+  if (!profile || profile.role !== "admin") return [];
+
+  // Prefer service role so admin dashboard is not blocked if JWT email claim
+  // does not satisfy is_admin() RLS. Fall back to user session otherwise.
+  const supabase = getSupabaseSecretKey() ? createServiceClient() : await createClient();
+  // tree_access.user_id → auth.users (not profiles): do not embed profiles.
   const { data, error } = await supabase
     .from("tree_access")
-    .select("*, profile:profiles(display_name, avatar_url), village:villages(name, slug)")
+    .select("*, village:villages(name, slug)")
     .eq("status", "pending")
     .order("requested_at", { ascending: false });
+  // #region agent log
+  try {
+    const { appendFile, mkdir } = await import("fs/promises");
+    const path = await import("path");
+    const logPath = path.join(process.cwd(), ".cursor", "debug-947054.log");
+    await mkdir(path.dirname(logPath), { recursive: true });
+    await appendFile(
+      logPath,
+      `${JSON.stringify({
+        sessionId: "947054",
+        runId: "post-fix",
+        hypothesisId: "B",
+        location: "data.ts:getPendingTreeAccessRequests",
+        message: "pending tree_access query",
+        data: {
+          usedServiceRole: Boolean(getSupabaseSecretKey()),
+          adminId: profile.id,
+          error: error?.message ?? null,
+          count: data?.length ?? 0,
+          ids: (data ?? []).map((row) => row.id),
+        },
+        timestamp: Date.now(),
+      })}\n`,
+      "utf8",
+    );
+  } catch {
+    /* ignore debug log failures */
+  }
+  // #endregion
   if (error) {
     console.error("getPendingTreeAccessRequests", error.message);
     return [];
   }
-  return (data ?? []) as TreeAccess[];
+  const rows = (data ?? []) as TreeAccess[];
+  if (rows.length === 0) return rows;
+
+  const userIds = [...new Set(rows.map((row) => row.user_id))];
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, display_name, avatar_url")
+    .in("id", userIds);
+  const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const merged = rows.map((row) => ({
+    ...row,
+    profile: byId.get(row.user_id)
+      ? {
+          display_name: byId.get(row.user_id)!.display_name,
+          avatar_url: byId.get(row.user_id)!.avatar_url,
+        }
+      : null,
+  }));
+  // #region agent log
+  try {
+    const { appendFile } = await import("fs/promises");
+    const path = await import("path");
+    await appendFile(
+      path.join(process.cwd(), ".cursor", "debug-947054.log"),
+      `${JSON.stringify({
+        sessionId: "947054",
+        runId: "post-fix",
+        hypothesisId: "B",
+        location: "data.ts:getPendingTreeAccessRequests:merged",
+        message: "merged profiles onto requests",
+        data: {
+          count: merged.length,
+          names: merged.map((row) => row.profile?.display_name ?? null),
+        },
+        timestamp: Date.now(),
+      })}\n`,
+      "utf8",
+    );
+  } catch {
+    /* ignore */
+  }
+  // #endregion
+  return merged;
 }
 
 export async function getPendingProposals(): Promise<EditProposal[]> {
