@@ -18,15 +18,19 @@ export async function PATCH(request: Request) {
   }
 
   const supabase = createServiceClient();
-  const { error } = await supabase
-    .from("tree_access")
-    .update({
-      status: body.status,
-      role: body.status === "approved" ? (body.role ?? "viewer") : undefined,
-      decided_at: new Date().toISOString(),
-      decided_by: profile.id,
-    })
-    .eq("id", body.id);
+  const patch: {
+    status: "approved" | "rejected";
+    decided_at: string;
+    decided_by: string;
+    role?: "viewer" | "contributor";
+  } = {
+    status: body.status,
+    decided_at: new Date().toISOString(),
+    decided_by: profile.id,
+  };
+  if (body.status === "approved") patch.role = body.role ?? "viewer";
+
+  const { error } = await supabase.from("tree_access").update(patch).eq("id", body.id);
 
   // #region agent log
   try {
