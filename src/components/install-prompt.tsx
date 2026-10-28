@@ -16,6 +16,7 @@ declare global {
 }
 
 const DISMISS_KEY = "sop-install-dismissed-at";
+const INSTALLED_KEY = "sop-pwa-installed";
 const DISMISS_DAYS = 14;
 /** Soft engagement wait before soft-prompt (no BIP). */
 const ENGAGE_MS = 25_000;
@@ -28,8 +29,24 @@ function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
+    window.matchMedia("(display-mode: fullscreen)").matches ||
+    window.matchMedia("(display-mode: minimal-ui)").matches ||
     // @ts-expect-error iOS Safari
     window.navigator.standalone === true
+  );
+}
+
+/** Phone / tablet only — never show the install invite on desktop web. */
+function isMobileClient(): boolean {
+  if (typeof window === "undefined") return false;
+  const ua = window.navigator.userAgent.toLowerCase();
+  if (/android|iphone|ipad|ipod|webos|blackberry|iemobile|opera mini|mobile/.test(ua)) {
+    return true;
+  }
+  // iPadOS desktop-UA spoof: touch Mac.
+  return (
+    window.navigator.platform === "MacIntel" &&
+    (window.navigator.maxTouchPoints ?? 0) > 1
   );
 }
 
@@ -62,6 +79,22 @@ function markDismissed() {
   }
 }
 
+function markInstalled() {
+  try {
+    localStorage.setItem(INSTALLED_KEY, "1");
+  } catch {
+    // ignore
+  }
+}
+
+function wasInstalledBefore(): boolean {
+  try {
+    return localStorage.getItem(INSTALLED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function detectIos(): boolean {
   if (typeof window === "undefined") return false;
   const ua = window.navigator.userAgent.toLowerCase();
@@ -84,6 +117,7 @@ export function InstallPrompt() {
 
     const standalone = isStandalone();
     const forced = isForcedInstall();
+    const mobile = isMobileClient();
     const ios = detectIos();
     setIsIos(ios);
     if (ios) setShowInstallHelp(true);
@@ -91,7 +125,20 @@ export function InstallPrompt() {
     document.documentElement.toggleAttribute("data-force-install", forced);
     document.documentElement.setAttribute("data-show-install", "");
 
+    // Opened from installed PWA → remember and never invite again on this device.
     if (standalone) {
+      markInstalled();
+      setVisible(false);
+      return;
+    }
+
+    // Desktop web: never show (except explicit ?install=1 test).
+    if (!mobile && !forced) {
+      setVisible(false);
+      return;
+    }
+
+    if (!forced && wasInstalledBefore()) {
       setVisible(false);
       return;
     }
@@ -113,7 +160,9 @@ export function InstallPrompt() {
 
     const reveal = () => {
       if (shown) return;
+      if (isStandalone() || wasInstalledBefore()) return;
       if (!forced && wasDismissedRecently()) return;
+      if (!forced && !isMobileClient()) return;
       shown = true;
       setVisible(true);
     };
@@ -153,6 +202,7 @@ export function InstallPrompt() {
       if (window.__sopInstallPrompt) acceptPrompt(window.__sopInstallPrompt);
     };
     const onInstalled = () => {
+      markInstalled();
       setVisible(false);
       markDismissed();
     };
@@ -166,7 +216,21 @@ export function InstallPrompt() {
     window.addEventListener("scroll", onScroll, { passive: true });
     onEarlyPrompt();
 
-    // No BIP (Safari / iOS / already-installed criteria): soft invite after engagement wait.
+    // Chromium: related apps API — hide if already installed as PWA.
+    const nav = navigator as Navigator & {
+      getInstalledRelatedApps?: () => Promise<unknown[]>;
+    };
+    if (typeof nav.getInstalledRelatedApps === "function") {
+      void nav.getInstalledRelatedApps().then((apps) => {
+        if (apps?.length) {
+          markInstalled();
+          setVisible(false);
+          shown = true;
+        }
+      }).catch(() => {});
+    }
+
+    // Soft invite only on mobile when not already installed (Safari / no BIP).
     if (!forced) {
       timers.push(window.setTimeout(() => maybeReveal("timer"), ENGAGE_MS) as unknown as number);
     }
@@ -207,6 +271,7 @@ export function InstallPrompt() {
       await deferred.prompt();
       const choice = await deferred.userChoice;
       if (choice.outcome === "accepted") {
+        markInstalled();
         setVisible(false);
         markDismissed();
       }
