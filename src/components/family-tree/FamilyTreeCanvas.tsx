@@ -771,7 +771,7 @@ function SelectionBar({
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(true)}
-                  className="pressable rounded-full border border-[#E7B6B6] bg-[#FDF4F4] px-3 py-1.5 text-[11px] font-semibold text-[#9B3B3B] transition hover:border-[#D98989] hover:bg-[#F8E8E8]"
+                  className="pressable rounded-full border border-border-soft bg-white px-3 py-1.5 text-[11px] font-semibold text-text-secondary transition hover:border-border hover:text-text"
                 >
                   Sil
                 </button>
@@ -781,8 +781,8 @@ function SelectionBar({
               </span>
             </div>
             {canRemove && confirmDelete && (
-              <div className="mt-2.5 flex flex-col gap-2 rounded-[16px] border border-[#E7B6B6]/70 bg-[#FDF6F6] px-3 py-2.5">
-                <p className="text-[12px] leading-snug text-[#7A3030]">
+              <div className="mt-2.5 flex flex-col gap-2 rounded-[14px] border border-border-soft bg-bg-elevated/80 px-3 py-2.5">
+                <p className="text-[12px] leading-snug text-text-secondary">
                   {isAdmin
                     ? `“${person.full_name}” kalıcı silinecek. Bağları da gider; geri alınamaz.`
                     : `“${person.full_name}” için silme önerisi admin onayına gider.`}
@@ -792,7 +792,7 @@ function SelectionBar({
                     value={reason}
                     onChange={(event) => setReason(event.target.value)}
                     placeholder="Neden silinmeli? (isteğe bağlı)"
-                    className="w-full rounded-[12px] border border-[#E7B6B6]/60 bg-white px-3 py-2 text-[13px] outline-none placeholder:text-text-tertiary focus:border-[#D98989] focus:ring-2 focus:ring-[#E7B6B6]/35"
+                    className="w-full rounded-[12px] border border-border-soft bg-white px-3 py-2 text-[13px] outline-none placeholder:text-text-tertiary focus:border-accent/40 focus:ring-2 focus:ring-accent/15"
                   />
                 )}
                 <div className="flex flex-wrap gap-1.5">
@@ -800,7 +800,7 @@ function SelectionBar({
                     type="button"
                     disabled={busy || removing}
                     onClick={() => void confirm()}
-                    className="pressable rounded-full bg-[#9B3B3B] px-3.5 py-1.5 text-[11px] font-semibold text-white shadow-[0_6px_16px_rgba(155,59,59,0.22)] transition hover:bg-[#7F2F2F] disabled:opacity-60"
+                    className="pressable rounded-full bg-text px-3.5 py-1.5 text-[11px] font-semibold text-white transition hover:bg-[#2d2d2f] disabled:opacity-60"
                   >
                     {removing || busy ? "İşleniyor…" : isAdmin ? "Kalıcı sil" : "Öneri gönder"}
                   </button>

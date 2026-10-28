@@ -176,6 +176,35 @@ export function layoutVillage(
     }
   }
 
+  // When spouses' primary cards sit in different households (wife natal tree vs
+  // husband household), connect those primaries with a dashed cross link. The
+  // in-household union line beside the husband still draws separately.
+  const seenSpouse = new Set<string>();
+  for (const [personId, spouseIds] of graph.spouses) {
+    for (const spouseId of spouseIds) {
+      const pairKey = personId < spouseId ? `${personId}:${spouseId}` : `${spouseId}:${personId}`;
+      if (seenSpouse.has(pairKey)) continue;
+      seenSpouse.add(pairKey);
+      const aKey = primaryCardByPerson.get(personId);
+      const bKey = primaryCardByPerson.get(spouseId);
+      if (!aKey || !bKey) continue;
+      const a = cardByKey.get(aKey)!;
+      const b = cardByKey.get(bKey)!;
+      if (a.householdId === b.householdId && a.familyId === b.familyId) continue;
+      const x1 = a.x + a.w / 2;
+      const y1 = a.y + a.h / 2;
+      const x2 = b.x + b.w / 2;
+      const y2 = b.y + b.h / 2;
+      const lift = Math.min(220, Math.abs(x2 - x1) * 0.22 + 70);
+      edges.push({
+        key: `cross-spouse:${pairKey}`,
+        kind: "cross",
+        d: `M ${x1} ${y1} C ${x1} ${y1 - lift}, ${x2} ${y2 - lift}, ${x2} ${y2}`,
+        personIds: [personId, spouseId],
+      });
+    }
+  }
+
   const bounds = frames.length
     ? {
         x: Math.min(...frames.map((f) => f.x)),
@@ -453,6 +482,22 @@ function layoutFamily(
 /* Household construction                                              */
 /* ------------------------------------------------------------------ */
 
+function isMalePerson(person: Person | undefined): boolean {
+  return person?.gender === "male";
+}
+
+function isFemalePerson(person: Person | undefined): boolean {
+  return person?.gender === "female";
+}
+
+/**
+ * Patrilineal couple layout:
+ * - Beside a male blood person, draw his wife (ghost if she has her own tree).
+ * - Beside a female blood person, do NOT draw a husband who already has (or will
+ *   have) his own family tree — she sits next to him there instead. Only keep a
+ *   husband here when he would otherwise disappear (no other village family).
+ * - Members are always ordered men → women so the wife sits to the husband's right.
+ */
 function buildHousehold(
   anchorId: string,
   F: string,
@@ -463,26 +508,37 @@ function buildHousehold(
   visited.add(anchorId);
   const anchor = graph.people.get(anchorId)!;
   const spouseIds = spousesOf(graph, anchorId);
+  const anchorIsFemale = isFemalePerson(anchor);
 
-  const left: Member[] = [];
-  const right: Member[] = [];
+  const partnerMembers: Member[] = [];
   for (const partnerId of partnersOf(graph, anchorId)) {
     const partner = graph.people.get(partnerId)!;
     const hasOwnTree = partner.family_id !== F && familyIds.has(partner.family_id);
+    const partnerIsMale = isMalePerson(partner);
+
+    // Wife stays in her natal tree alone; she appears beside her husband in his tree.
+    if (anchorIsFemale && partnerIsMale && hasOwnTree) continue;
+
     const ghost = visited.has(partnerId) || hasOwnTree;
     if (!ghost) visited.add(partnerId);
-    const member: Member = { personId: partnerId, ghost, informal: !spouseIds.includes(partnerId) };
-    const partnerIsMale = partner.gender === "male" || (partner.gender !== "female" && anchor.gender === "female");
-    (partnerIsMale ? left : right).push(member);
+    partnerMembers.push({
+      personId: partnerId,
+      ghost,
+      informal: !spouseIds.includes(partnerId),
+    });
   }
-  const members: Member[] = [...left, { personId: anchorId, ghost: false, informal: false }, ...right];
+
+  const self: Member = { personId: anchorId, ghost: false, informal: false };
+  const all = [...partnerMembers, self];
+  const males = all.filter((member) => isMalePerson(graph.people.get(member.personId)));
+  const females = all.filter((member) => !isMalePerson(graph.people.get(member.personId)));
+  const members: Member[] = [...males, ...females];
 
   // Group children by the other parent (union).
   const unionByPartner = new Map<string | null, Union>();
   const unionOrder: Array<string | null> = [
-    ...left.map((m) => m.personId),
+    ...partnerMembers.map((m) => m.personId),
     null,
-    ...right.map((m) => m.personId),
   ];
   for (const key of unionOrder) unionByPartner.set(key, { partnerId: key, childIds: [] });
 
