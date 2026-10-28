@@ -23,18 +23,23 @@ export function AdminProposals({ proposals }: { proposals: EditProposal[] }) {
     }
 
     if (accept && proposal.action === "delete") {
-      const table =
-        proposal.target_type === "village"
-          ? "villages"
-          : proposal.target_type === "family"
-            ? "families"
+      const now = new Date().toISOString();
+      if (proposal.target_type === "family") {
+        await supabase
+          .from("people")
+          .update({ deleted_at: now })
+          .eq("family_id", proposal.target_id)
+          .is("deleted_at", null);
+        await supabase.from("families").update({ deleted_at: now }).eq("id", proposal.target_id);
+      } else {
+        const table =
+          proposal.target_type === "village"
+            ? "villages"
             : proposal.target_type === "person"
               ? "people"
               : "person_relations";
-      await supabase
-        .from(table)
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", proposal.target_id);
+        await supabase.from(table).update({ deleted_at: now }).eq("id", proposal.target_id);
+      }
     }
 
     if (accept && proposal.action === "update" && proposal.payload) {
@@ -87,7 +92,15 @@ export function AdminProposals({ proposals }: { proposals: EditProposal[] }) {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-[14px] font-semibold tracking-[-0.02em]">
-                  {p.action === "delete" ? "Silme" : "Güncelleme"} · {p.target_type}
+                  {p.action === "delete" ? "Silme" : "Güncelleme"} ·{" "}
+                  {p.target_type === "family"
+                    ? "aile"
+                    : p.target_type === "person"
+                      ? "kişi"
+                      : p.target_type === "village"
+                        ? "köy"
+                        : p.target_type}
+                  {typeof p.payload?.name === "string" ? ` · ${p.payload.name}` : ""}
                 </p>
                 <p className="mt-1 text-[13px] text-text-secondary">
                   {p.reason ?? "Gerekçe yok"} · {relativeTime(p.created_at)}

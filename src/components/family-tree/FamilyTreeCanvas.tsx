@@ -1,10 +1,12 @@
 "use client";
 
+import { SoftDeleteButton } from "@/components/comments-panel";
 import { PersonAvatar } from "@/components/person-avatar";
 import { PersonCard } from "@/components/family-tree/PersonCard";
 import { useTreeEditor } from "@/components/family-tree/TreeEditor";
 import { TreeToolbar, ZoomControls } from "@/components/family-tree/TreeToolbar";
 import { usePanZoom } from "@/components/family-tree/use-pan-zoom";
+import { useAuth } from "@/components/auth-provider";
 import { childrenOf, parentsOf, spousesOf } from "@/lib/pedigree/graph";
 import { kinshipLabels } from "@/lib/pedigree/kinship";
 import { layoutVillage, type LayoutCard } from "@/lib/pedigree/layout";
@@ -30,6 +32,7 @@ export function FamilyTreeCanvas({
   people,
   relations,
   canEdit,
+  canRemoveFamily = false,
   topSlot,
   fullscreen = true,
 }: {
@@ -40,9 +43,14 @@ export function FamilyTreeCanvas({
   people: Person[];
   relations: PersonRelation[];
   canEdit: boolean;
+  /** Admin deletes immediately; contributors submit an admin-approval proposal. */
+  canRemoveFamily?: boolean;
   topSlot?: React.ReactNode;
   fullscreen?: boolean;
 }) {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
+
   /* ------------------------------------------------------------ data */
   const [liveFamilies, setFamilies] = useState(families);
   const [livePeople, setPeople] = useState(people);
@@ -360,19 +368,61 @@ export function FamilyTreeCanvas({
                 )}
                 style={{ left: frame.x, top: frame.y, width: frame.w, height: frame.h }}
               >
-                <button
-                  type="button"
+                <div
                   data-no-pan
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    focusFamily(frame.familyId);
-                  }}
-                  className="pedigree-frame-label absolute left-5 top-3 flex items-baseline gap-2 rounded-full px-3 py-1 text-left"
+                  className="absolute left-5 top-3 z-10 flex max-w-[calc(100%-2.5rem)] flex-wrap items-center gap-1.5"
                 >
-                  <span className="text-[15px] font-semibold tracking-[-0.02em]">{frame.name} Ailesi</span>
-                  {family?.aka && <span className="text-[11px] text-text-secondary">· {family.aka}</span>}
-                  {sample && <span className="rounded-full bg-[#FFF1D6] px-2 py-[1px] text-[10px] font-semibold text-[#9A5B00]">Örnek</span>}
-                </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      focusFamily(frame.familyId);
+                    }}
+                    className="pedigree-frame-label flex items-baseline gap-2 rounded-full px-3 py-1 text-left"
+                  >
+                    <span className="text-[15px] font-semibold tracking-[-0.02em]">{frame.name} Ailesi</span>
+                    {family?.aka && <span className="text-[11px] text-text-secondary">· {family.aka}</span>}
+                    {sample && (
+                      <span className="rounded-full bg-[#FFF1D6] px-2 py-[1px] text-[10px] font-semibold text-[#9A5B00]">
+                        Örnek
+                      </span>
+                    )}
+                  </button>
+                  {canRemoveFamily && !sample && (
+                    <SoftDeleteButton
+                      table="families"
+                      id={frame.familyId}
+                      displayName={frame.name}
+                      compact
+                      label={isAdmin ? "Sil" : "Silme öner"}
+                      onDone={(mode) => {
+                        if (mode === "deleted") {
+                          const removedPeople = new Set(
+                            livePeople
+                              .filter((person) => person.family_id === frame.familyId)
+                              .map((person) => person.id),
+                          );
+                          setFamilies((prev) => prev.filter((f) => f.id !== frame.familyId));
+                          setPeople((prev) => prev.filter((p) => p.family_id !== frame.familyId));
+                          setRelations((prev) =>
+                            prev.filter(
+                              (r) =>
+                                !removedPeople.has(r.person_id) &&
+                                !removedPeople.has(r.related_person_id),
+                            ),
+                          );
+                          if (activeFamilyId === frame.familyId) setActiveFamilyId(null);
+                          if (selectedCard?.familyId === frame.familyId) setSelectedKey(null);
+                          setToast(`“${frame.name}” ailesi silindi`);
+                        } else {
+                          setToast(
+                            `“${frame.name}” için silme önerisi gönderildi · admin onayı bekleniyor`,
+                          );
+                        }
+                      }}
+                    />
+                  )}
+                </div>
               </div>
             );
           })}

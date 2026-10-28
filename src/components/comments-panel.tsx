@@ -176,17 +176,32 @@ export function DisputeToggle({
 export function SoftDeleteButton({
   table,
   id,
-  label = "Kaldır (öneri)",
+  displayName,
+  label,
+  compact = false,
+  className,
+  onDone,
 }: {
   table: "villages" | "families" | "people";
   id: string;
+  /** Shown in confirm copy and stored on delete proposals for admin review. */
+  displayName?: string;
   label?: string;
+  /** Smaller chip trigger for atlas / list cards. */
+  compact?: boolean;
+  className?: string;
+  onDone?: (mode: "deleted" | "proposed") => void;
 }) {
   const { user, profile, requireAuth } = useAuth();
   const router = useRouter();
   const [reason, setReason] = useState("");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const isAdmin = profile?.role === "admin";
+  const entity =
+    table === "villages" ? "köy" : table === "families" ? "aile" : "kişi";
+  const triggerLabel =
+    label ?? (isAdmin ? `${entity === "aile" ? "Aileyi" : entity === "kişi" ? "Kişiyi" : "Köyü"} sil` : "Silme öner");
 
   async function run() {
     const ok = await requireAuth();
@@ -202,45 +217,91 @@ export function SoftDeleteButton({
       return;
     }
 
-    // Admins soft-delete immediately; members create a proposal
-    if (profile?.role === "admin") {
-      await supabase
-        .from(table)
-        .update({ deleted_at: new Date().toISOString() })
-        .eq("id", id);
-    } else {
-      await supabase.from("edit_proposals").insert({
-        target_type: table === "villages" ? "village" : table === "families" ? "family" : "person",
-        target_id: id,
-        action: "delete",
-        reason: reason.trim() || "Silme önerisi",
-        proposed_by: u.id,
-      });
+    const now = new Date().toISOString();
+
+    // Admins soft-delete immediately; members create a proposal for admin approval.
+    if (isAdmin) {
+      if (table === "families") {
+        await supabase
+          .from("people")
+          .update({ deleted_at: now })
+          .eq("family_id", id)
+          .is("deleted_at", null);
+      }
+      await supabase.from(table).update({ deleted_at: now }).eq("id", id);
+      setBusy(false);
+      setOpen(false);
+      onDone?.("deleted");
+      router.refresh();
+      return;
     }
+
+    await supabase.from("edit_proposals").insert({
+      target_type: table === "villages" ? "village" : table === "families" ? "family" : "person",
+      target_id: id,
+      action: "delete",
+      payload: displayName ? { name: displayName } : null,
+      reason: reason.trim() || (displayName ? `${displayName} silme önerisi` : "Silme önerisi"),
+      proposed_by: u.id,
+    });
 
     setBusy(false);
     setOpen(false);
+    onDone?.("proposed");
     router.refresh();
   }
 
   if (!open) {
+    if (compact) {
+      return (
+        <button
+          type="button"
+          className={
+            className ??
+            "rounded-full border border-danger/25 bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-danger shadow-sm backdrop-blur hover:bg-danger/10"
+          }
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            void (user ? setOpen(true) : requireAuth());
+          }}
+        >
+          {triggerLabel}
+        </button>
+      );
+    }
     return (
-      <Button variant="ghost" onClick={() => void (user ? setOpen(true) : requireAuth())}>
-        {label}
+      <Button
+        variant="ghost"
+        className={className}
+        onClick={() => void (user ? setOpen(true) : requireAuth())}
+      >
+        {triggerLabel}
       </Button>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-[12px] border border-border-soft bg-bg-elevated p-3">
-      <Input
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-        placeholder="Neden kaldırılmalı?"
-      />
+    <div
+      className="flex min-w-[220px] flex-col gap-2 rounded-[12px] border border-border-soft bg-bg-elevated p-3 shadow-lg"
+      onClick={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
+    >
+      <p className="text-[12px] leading-snug text-text-secondary">
+        {isAdmin
+          ? `${displayName ? `“${displayName}”` : `Bu ${entity}`} kalıcı olarak listeden kalkar.`
+          : `Admin onayından sonra ${displayName ? `“${displayName}”` : `bu ${entity}`} silinir.`}
+      </p>
+      {!isAdmin && (
+        <Input
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Neden kaldırılmalı?"
+        />
+      )}
       <div className="flex gap-2">
         <Button variant="danger" disabled={busy} onClick={() => void run()}>
-          {profile?.role === "admin" ? "Sil" : "Öneri gönder"}
+          {isAdmin ? "Sil" : "Öneri gönder"}
         </Button>
         <Button variant="ghost" onClick={() => setOpen(false)}>
           Vazgeç

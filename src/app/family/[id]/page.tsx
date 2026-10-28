@@ -87,7 +87,13 @@ export default async function FamilyPage({
               label="Aileyi paylaş"
             />
             {isAdmin && <DisputeToggle table="families" id={family.id} disputed={family.disputed} />}
-            {canPropose && <SoftDeleteButton table="families" id={family.id} />}
+            {canPropose && (
+              <SoftDeleteButton
+                table="families"
+                id={family.id}
+                displayName={family.name}
+              />
+            )}
           </>
         }
       />

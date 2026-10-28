@@ -1,5 +1,6 @@
 "use client";
 
+import { SoftDeleteButton } from "@/components/comments-panel";
 import { CreateFamilyForm } from "@/components/create-family-form";
 import { FamilyTreeLazy } from "@/components/family-tree/FamilyTreeLazy";
 import { TreeAccessGate } from "@/components/tree-access-gate";
@@ -148,6 +149,7 @@ export function VillageWorkspace({
           people={people}
           relations={relations}
           canEdit={canEditTree}
+          canRemoveFamily={canEditTree}
           fullscreen
           topSlot={tabs}
         />
@@ -168,10 +170,14 @@ export function VillageWorkspace({
       ) : (
         <ul className="stagger mb-8 grid gap-3 sm:grid-cols-2">
           {families.map((f) => (
-            <li key={f.id}>
+            <li key={f.id} className="relative">
               <Link
                 href={`/family/${f.id}`}
-                className="group block rounded-[20px] border border-white/80 bg-[linear-gradient(145deg,#ffffff_0%,#f3f8fa_100%)] p-5 shadow-[0_10px_34px_rgba(35,62,82,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-[#9FC8BD] hover:shadow-[0_20px_48px_rgba(35,96,81,0.14)]"
+                className={
+                  canEditTree
+                    ? "group block rounded-[20px] border border-white/80 bg-[linear-gradient(145deg,#ffffff_0%,#f3f8fa_100%)] p-5 pb-14 shadow-[0_10px_34px_rgba(35,62,82,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-[#9FC8BD] hover:shadow-[0_20px_48px_rgba(35,96,81,0.14)]"
+                    : "group block rounded-[20px] border border-white/80 bg-[linear-gradient(145deg,#ffffff_0%,#f3f8fa_100%)] p-5 shadow-[0_10px_34px_rgba(35,62,82,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-[#9FC8BD] hover:shadow-[0_20px_48px_rgba(35,96,81,0.14)]"
+                }
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -195,6 +201,17 @@ export function VillageWorkspace({
                   <p className="mt-2 line-clamp-2 text-[13px] text-text-secondary">{f.notes}</p>
                 )}
               </Link>
+              {canEditTree && (
+                <div className="absolute bottom-3 left-3 z-10" onClick={(e) => e.preventDefault()}>
+                  <SoftDeleteButton
+                    table="families"
+                    id={f.id}
+                    displayName={f.name}
+                    compact
+                    label={canManageTree ? "Aileyi sil" : "Silme öner"}
+                  />
+                </div>
+              )}
             </li>
           ))}
         </ul>
