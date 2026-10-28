@@ -23,23 +23,16 @@ export function AdminProposals({ proposals }: { proposals: EditProposal[] }) {
     }
 
     if (accept && proposal.action === "delete") {
-      const now = new Date().toISOString();
-      if (proposal.target_type === "family") {
-        await supabase
-          .from("people")
-          .update({ deleted_at: now })
-          .eq("family_id", proposal.target_id)
-          .is("deleted_at", null);
-        await supabase.from("families").update({ deleted_at: now }).eq("id", proposal.target_id);
-      } else {
-        const table =
-          proposal.target_type === "village"
-            ? "villages"
+      const table =
+        proposal.target_type === "village"
+          ? "villages"
+          : proposal.target_type === "family"
+            ? "families"
             : proposal.target_type === "person"
               ? "people"
               : "person_relations";
-        await supabase.from(table).update({ deleted_at: now }).eq("id", proposal.target_id);
-      }
+      // Hard delete — people cascade from families via FK.
+      await supabase.from(table).delete().eq("id", proposal.target_id);
     }
 
     if (accept && proposal.action === "update" && proposal.payload) {

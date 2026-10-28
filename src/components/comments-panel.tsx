@@ -217,26 +217,21 @@ export function SoftDeleteButton({
       return;
     }
 
-    const now = new Date().toISOString();
-
-    // Admins soft-delete immediately; members create a proposal for admin approval.
+    // Admins hard-delete immediately; members create a proposal for admin approval.
     if (isAdmin) {
-      if (table === "families") {
-        await supabase
-          .from("people")
-          .update({ deleted_at: now })
-          .eq("family_id", id)
-          .is("deleted_at", null);
-      }
-      await supabase.from(table).update({ deleted_at: now }).eq("id", id);
+      const { error } = await supabase.from(table).delete().eq("id", id);
       setBusy(false);
+      if (error) {
+        setOpen(false);
+        return;
+      }
       setOpen(false);
       onDone?.("deleted");
       router.refresh();
       return;
     }
 
-    await supabase.from("edit_proposals").insert({
+    const { error } = await supabase.from("edit_proposals").insert({
       target_type: table === "villages" ? "village" : table === "families" ? "family" : "person",
       target_id: id,
       action: "delete",
@@ -246,6 +241,7 @@ export function SoftDeleteButton({
     });
 
     setBusy(false);
+    if (error) return;
     setOpen(false);
     onDone?.("proposed");
     router.refresh();
@@ -289,8 +285,8 @@ export function SoftDeleteButton({
     >
       <p className="text-[12px] leading-snug text-text-secondary">
         {isAdmin
-          ? `${displayName ? `“${displayName}”` : `Bu ${entity}`} kalıcı olarak listeden kalkar.`
-          : `Admin onayından sonra ${displayName ? `“${displayName}”` : `bu ${entity}`} silinir.`}
+          ? `${displayName ? `“${displayName}”` : `Bu ${entity}`} kalıcı silinir; geri alınamaz.`
+          : `Admin onayından sonra ${displayName ? `“${displayName}”` : `bu ${entity}`} kalıcı silinir.`}
       </p>
       {!isAdmin && (
         <Input

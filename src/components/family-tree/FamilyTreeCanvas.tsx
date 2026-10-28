@@ -1,12 +1,11 @@
 "use client";
 
-import { SoftDeleteButton } from "@/components/comments-panel";
+import { useAuth } from "@/components/auth-provider";
 import { PersonAvatar } from "@/components/person-avatar";
 import { PersonCard } from "@/components/family-tree/PersonCard";
 import { useTreeEditor } from "@/components/family-tree/TreeEditor";
 import { TreeToolbar, ZoomControls } from "@/components/family-tree/TreeToolbar";
 import { usePanZoom } from "@/components/family-tree/use-pan-zoom";
-import { useAuth } from "@/components/auth-provider";
 import { childrenOf, parentsOf, spousesOf } from "@/lib/pedigree/graph";
 import { kinshipLabels } from "@/lib/pedigree/kinship";
 import { layoutVillage, type LayoutCard } from "@/lib/pedigree/layout";
@@ -32,7 +31,6 @@ export function FamilyTreeCanvas({
   people,
   relations,
   canEdit,
-  canRemoveFamily = false,
   topSlot,
   fullscreen = true,
 }: {
@@ -43,8 +41,6 @@ export function FamilyTreeCanvas({
   people: Person[];
   relations: PersonRelation[];
   canEdit: boolean;
-  /** Admin deletes immediately; contributors submit an admin-approval proposal. */
-  canRemoveFamily?: boolean;
   topSlot?: React.ReactNode;
   fullscreen?: boolean;
 }) {
@@ -59,7 +55,13 @@ export function FamilyTreeCanvas({
   useEffect(() => setPeople(people), [people]);
   useEffect(() => setRelations(relations), [relations]);
 
-  const sampleMode = livePeople.length === 0;
+  // Sample preview only for a truly empty village — never after real people
+  // existed (otherwise deleting the last person resurrects the sample tree).
+  const [allowSample, setAllowSample] = useState(() => people.length === 0);
+  useEffect(() => {
+    if (people.length > 0) setAllowSample(false);
+  }, [people.length]);
+  const sampleMode = allowSample && livePeople.length === 0;
   const display = useMemo(() => {
     if (!sampleMode) return { families: liveFamilies, people: livePeople, relations: liveRelations };
     const sample = buildSampleTree(villageId);
@@ -368,61 +370,23 @@ export function FamilyTreeCanvas({
                 )}
                 style={{ left: frame.x, top: frame.y, width: frame.w, height: frame.h }}
               >
-                <div
+                <button
+                  type="button"
                   data-no-pan
-                  className="absolute left-5 top-3 z-10 flex max-w-[calc(100%-2.5rem)] flex-wrap items-center gap-1.5"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    focusFamily(frame.familyId);
+                  }}
+                  className="pedigree-frame-label absolute left-5 top-3 flex items-baseline gap-2 rounded-full px-3 py-1 text-left"
                 >
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      focusFamily(frame.familyId);
-                    }}
-                    className="pedigree-frame-label flex items-baseline gap-2 rounded-full px-3 py-1 text-left"
-                  >
-                    <span className="text-[15px] font-semibold tracking-[-0.02em]">{frame.name} Ailesi</span>
-                    {family?.aka && <span className="text-[11px] text-text-secondary">· {family.aka}</span>}
-                    {sample && (
-                      <span className="rounded-full bg-[#FFF1D6] px-2 py-[1px] text-[10px] font-semibold text-[#9A5B00]">
-                        Örnek
-                      </span>
-                    )}
-                  </button>
-                  {canRemoveFamily && !sample && (
-                    <SoftDeleteButton
-                      table="families"
-                      id={frame.familyId}
-                      displayName={frame.name}
-                      compact
-                      label={isAdmin ? "Sil" : "Silme öner"}
-                      onDone={(mode) => {
-                        if (mode === "deleted") {
-                          const removedPeople = new Set(
-                            livePeople
-                              .filter((person) => person.family_id === frame.familyId)
-                              .map((person) => person.id),
-                          );
-                          setFamilies((prev) => prev.filter((f) => f.id !== frame.familyId));
-                          setPeople((prev) => prev.filter((p) => p.family_id !== frame.familyId));
-                          setRelations((prev) =>
-                            prev.filter(
-                              (r) =>
-                                !removedPeople.has(r.person_id) &&
-                                !removedPeople.has(r.related_person_id),
-                            ),
-                          );
-                          if (activeFamilyId === frame.familyId) setActiveFamilyId(null);
-                          if (selectedCard?.familyId === frame.familyId) setSelectedKey(null);
-                          setToast(`“${frame.name}” ailesi silindi`);
-                        } else {
-                          setToast(
-                            `“${frame.name}” için silme önerisi gönderildi · admin onayı bekleniyor`,
-                          );
-                        }
-                      }}
-                    />
+                  <span className="text-[15px] font-semibold tracking-[-0.02em]">{frame.name} Ailesi</span>
+                  {family?.aka && <span className="text-[11px] text-text-secondary">· {family.aka}</span>}
+                  {sample && (
+                    <span className="rounded-full bg-[#FFF1D6] px-2 py-[1px] text-[10px] font-semibold text-[#9A5B00]">
+                      Örnek
+                    </span>
                   )}
-                </div>
+                </button>
               </div>
             );
           })}
@@ -611,6 +575,9 @@ export function FamilyTreeCanvas({
           person={selectedPerson}
           kinLabel={labels.get(selectedPerson.id) ?? null}
           editable={editable}
+          canRemove={editable}
+          isAdmin={isAdmin}
+          busy={editor.busy}
           onClose={() => setSelectedKey(null)}
           onEdit={() => editor.openEdit(selectedPerson.id)}
           onConnections={() => editor.openConnections(selectedPerson.id)}
@@ -618,6 +585,20 @@ export function FamilyTreeCanvas({
           onJump={() => selectPerson(selectedPerson.id)}
           onSetReference={() => setReferenceId(selectedPerson.id)}
           isReference={referenceId === selectedPerson.id}
+          onRemove={async (reason) => {
+            const result = await editor.removePerson(selectedPerson.id, reason);
+            if (result === "deleted") {
+              setSelectedKey(null);
+              setToast(`“${selectedPerson.full_name}” kalıcı silindi`);
+              return null;
+            }
+            if (result === "proposed") {
+              setToast(`Silme önerisi gönderildi · admin onayı bekleniyor`);
+              return null;
+            }
+            setToast(result);
+            return result;
+          }}
         />
       )}
 
@@ -677,6 +658,9 @@ function SelectionBar({
   person,
   kinLabel,
   editable,
+  canRemove,
+  isAdmin,
+  busy,
   isReference,
   onClose,
   onEdit,
@@ -684,11 +668,15 @@ function SelectionBar({
   onAdd,
   onJump,
   onSetReference,
+  onRemove,
 }: {
   card: LayoutCard;
   person: Person;
   kinLabel: string | null;
   editable: boolean;
+  canRemove: boolean;
+  isAdmin: boolean;
+  busy: boolean;
   isReference: boolean;
   onClose: () => void;
   onEdit: () => void;
@@ -696,7 +684,24 @@ function SelectionBar({
   onAdd: (role: AddRole) => void;
   onJump: () => void;
   onSetReference: () => void;
+  onRemove: (reason?: string) => Promise<string | null>;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [reason, setReason] = useState("");
+  const [removing, setRemoving] = useState(false);
+
+  useEffect(() => {
+    setConfirmDelete(false);
+    setReason("");
+  }, [person.id]);
+
+  async function confirm() {
+    setRemoving(true);
+    const err = await onRemove(reason);
+    setRemoving(false);
+    if (!err) setConfirmDelete(false);
+  }
+
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4">
       <div className="pointer-events-auto kinship-sheet-enter w-full max-w-2xl rounded-[22px] border border-white/80 bg-white/95 p-3 shadow-[0_22px_60px_rgba(20,40,60,0.22)] backdrop-blur-xl">
@@ -743,28 +748,74 @@ function SelectionBar({
             </button>
           </div>
         ) : editable ? (
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {(["parent", "child", "spouse", "sibling"] as const).map((role) => (
-              <button
-                key={role}
-                type="button"
-                onClick={() => onAdd(role)}
-                className="pressable rounded-full border border-[#9FC8BD] bg-[#EFF8F5] px-3 py-1.5 text-[11px] font-semibold text-[#236B5B] hover:bg-[#DFF1EB]"
-              >
-                ＋ {ROLE_LABEL[role]}
+          <>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {(["parent", "child", "spouse", "sibling"] as const).map((role) => (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => onAdd(role)}
+                  className="pressable rounded-full border border-[#9FC8BD] bg-[#EFF8F5] px-3 py-1.5 text-[11px] font-semibold text-[#236B5B] hover:bg-[#DFF1EB]"
+                >
+                  ＋ {ROLE_LABEL[role]}
+                </button>
+              ))}
+              <span className="mx-0.5 w-px self-stretch bg-border-soft" aria-hidden />
+              <button type="button" onClick={onEdit} className="pressable rounded-full bg-text px-3 py-1.5 text-[11px] font-semibold text-white">
+                Düzenle
               </button>
-            ))}
-            <span className="mx-0.5 w-px self-stretch bg-border-soft" aria-hidden />
-            <button type="button" onClick={onEdit} className="pressable rounded-full bg-text px-3 py-1.5 text-[11px] font-semibold text-white">
-              Düzenle
-            </button>
-            <button type="button" onClick={onConnections} className="pressable rounded-full border border-border-soft bg-white px-3 py-1.5 text-[11px] font-semibold text-text hover:border-border">
-              Bağlar · kaldır
-            </button>
-            <span className="ml-auto hidden self-center text-[10px] text-text-tertiary md:block">
-              İpucu: kartı başka bir kartın üstüne sürükleyip bağ kur
-            </span>
-          </div>
+              <button type="button" onClick={onConnections} className="pressable rounded-full border border-border-soft bg-white px-3 py-1.5 text-[11px] font-semibold text-text hover:border-border">
+                Bağlar · kaldır
+              </button>
+              {canRemove && !confirmDelete && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  className="pressable rounded-full border border-[#E7B6B6] bg-[#FDF4F4] px-3 py-1.5 text-[11px] font-semibold text-[#9B3B3B] transition hover:border-[#D98989] hover:bg-[#F8E8E8]"
+                >
+                  Sil
+                </button>
+              )}
+              <span className="ml-auto hidden self-center text-[10px] text-text-tertiary md:block">
+                İpucu: kartı başka bir kartın üstüne sürükleyip bağ kur
+              </span>
+            </div>
+            {canRemove && confirmDelete && (
+              <div className="mt-2.5 flex flex-col gap-2 rounded-[16px] border border-[#E7B6B6]/70 bg-[#FDF6F6] px-3 py-2.5">
+                <p className="text-[12px] leading-snug text-[#7A3030]">
+                  {isAdmin
+                    ? `“${person.full_name}” kalıcı silinecek. Bağları da gider; geri alınamaz.`
+                    : `“${person.full_name}” için silme önerisi admin onayına gider.`}
+                </p>
+                {!isAdmin && (
+                  <input
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                    placeholder="Neden silinmeli? (isteğe bağlı)"
+                    className="w-full rounded-[12px] border border-[#E7B6B6]/60 bg-white px-3 py-2 text-[13px] outline-none placeholder:text-text-tertiary focus:border-[#D98989] focus:ring-2 focus:ring-[#E7B6B6]/35"
+                  />
+                )}
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    disabled={busy || removing}
+                    onClick={() => void confirm()}
+                    className="pressable rounded-full bg-[#9B3B3B] px-3.5 py-1.5 text-[11px] font-semibold text-white shadow-[0_6px_16px_rgba(155,59,59,0.22)] transition hover:bg-[#7F2F2F] disabled:opacity-60"
+                  >
+                    {removing || busy ? "İşleniyor…" : isAdmin ? "Kalıcı sil" : "Öneri gönder"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={removing}
+                    onClick={() => setConfirmDelete(false)}
+                    className="pressable rounded-full border border-border-soft bg-white px-3 py-1.5 text-[11px] font-semibold text-text-secondary hover:text-text"
+                  >
+                    Vazgeç
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         ) : null}
       </div>
     </div>

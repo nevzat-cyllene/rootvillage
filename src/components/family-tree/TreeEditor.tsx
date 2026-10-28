@@ -16,11 +16,11 @@ import { uploadPersonAvatar } from "@/lib/avatar-upload";
 import { partnersOf, type KinGraph } from "@/lib/pedigree/graph";
 import {
   deleteRelation,
+  hardDeletePerson,
   insertPerson,
   insertRelations,
   markFamilyFounder,
   planLink,
-  softDeletePerson,
   updatePerson,
 } from "@/lib/pedigree/mutations";
 import { insertSampleTree } from "@/lib/pedigree/sample-tree";
@@ -38,6 +38,8 @@ export type TreeEditor = {
   openFounder: (familyId: string) => void;
   openEdit: (personId: string) => void;
   openConnections: (personId: string) => void;
+  /** Admin: hard-delete. Contributor: edit_proposals delete request. */
+  removePerson: (personId: string, reason?: string) => Promise<"deleted" | "proposed" | string>;
   linkExisting: (role: AddRole, focusId: string, otherId: string, coParentId?: string | null) => Promise<string | null>;
   loadSample: () => Promise<void>;
   /** Sheets / dialogs; render once inside the canvas. */
@@ -68,7 +70,7 @@ export function useTreeEditor({
   onPersonCreated?: (personId: string) => void;
 }): TreeEditor {
   const router = useRouter();
-  const { requireAuth } = useAuth();
+  const { requireAuth, profile } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [add, setAdd] = useState<AddState>(null);
@@ -227,14 +229,14 @@ export function useTreeEditor({
         coParentId: add.role === "child" ? coParentId : null,
       });
       if (plan.error) {
-        await softDeletePerson(supabase, id);
+        await hardDeletePerson(supabase, id);
         setBusy(false);
         setError(plan.error);
         return;
       }
       const { ids, error: relationError } = await insertRelations(supabase, plan.rows, user.id);
       if (relationError) {
-        await softDeletePerson(supabase, id);
+        await hardDeletePerson(supabase, id);
         setBusy(false);
         setError(`Kişi oluşturuldu ancak bağ kurulamadı: ${relationError}`);
         return;
@@ -322,6 +324,55 @@ export function useTreeEditor({
       router.refresh();
     },
     [ensureUser, router, setRelations],
+  );
+
+  const removePerson = useCallback(
+    async (personId: string, reason?: string): Promise<"deleted" | "proposed" | string> => {
+      const session = await ensureUser();
+      if (!session) return "Giriş gerekli";
+      setBusy(true);
+      setError(null);
+      const person = people.find((p) => p.id === personId);
+      const isAdmin = profile?.role === "admin";
+
+      if (isAdmin) {
+        const deleteError = await hardDeletePerson(session.supabase, personId);
+        if (deleteError) {
+          setBusy(false);
+          setError(deleteError);
+          return deleteError;
+        }
+        setPeople((prev) => prev.filter((p) => p.id !== personId));
+        setRelations((prev) =>
+          prev.filter((r) => r.person_id !== personId && r.related_person_id !== personId),
+        );
+        setFamilies((prev) =>
+          prev.map((f) =>
+            f.founder_person_id === personId ? { ...f, founder_person_id: null } : f,
+          ),
+        );
+        setBusy(false);
+        router.refresh();
+        return "deleted";
+      }
+
+      const { error: proposalError } = await session.supabase.from("edit_proposals").insert({
+        target_type: "person",
+        target_id: personId,
+        action: "delete",
+        payload: person ? { name: person.full_name } : null,
+        reason: reason?.trim() || (person ? `${person.full_name} silme önerisi` : "Silme önerisi"),
+        proposed_by: session.user.id,
+      });
+      setBusy(false);
+      if (proposalError) {
+        setError(proposalError.message);
+        return proposalError.message;
+      }
+      router.refresh();
+      return "proposed";
+    },
+    [ensureUser, people, profile?.role, router, setFamilies, setPeople, setRelations],
   );
 
   const loadSample = useCallback(async () => {
@@ -458,6 +509,7 @@ export function useTreeEditor({
     openFounder,
     openEdit,
     openConnections,
+    removePerson,
     linkExisting,
     loadSample,
     sheets,
