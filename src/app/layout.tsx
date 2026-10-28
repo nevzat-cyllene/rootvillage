@@ -54,12 +54,17 @@ export default async function RootLayout({
   const profile = user ? await getCurrentProfile() : null;
 
   return (
-    <html lang="tr" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+    <html
+      lang="tr"
+      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      data-show-install=""
+      suppressHydrationWarning
+    >
       <head>
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var d=document.documentElement;d.setAttribute('data-show-install','');if(new URLSearchParams(location.search).get('install')==='1')d.setAttribute('data-force-install','');d.removeAttribute('data-standalone');}catch(e){}window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__sopInstallPrompt=e;window.dispatchEvent(new Event('sop:install-ready'));});if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').then(function(r){r.update&&r.update();}).catch(function(){});}})();",
+              "(function(){try{var d=document.documentElement;d.setAttribute('data-show-install','');if(new URLSearchParams(location.search).get('install')==='1')d.setAttribute('data-force-install','');else d.removeAttribute('data-force-install');d.removeAttribute('data-standalone');}catch(e){}window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__sopInstallPrompt=e;window.dispatchEvent(new Event('sop:install-ready'));});if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').then(function(r){r.update&&r.update();}).catch(function(){});}})();",
           }}
         />
       </head>
