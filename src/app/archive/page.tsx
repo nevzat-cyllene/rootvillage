@@ -3,33 +3,56 @@ import { CreateHeritageEntryForm } from "@/components/create-heritage-entry-form
 import { HeritageEntryCard } from "@/components/heritage-entry-card";
 import { Button, EmptyState, PageHeader, Surface } from "@/components/ui";
 import { getHeritageEntries } from "@/lib/data";
+import { heritageLabel } from "@/lib/heritage";
+import { heritageEntryTypes, type HeritageEntryType } from "@/lib/types";
 
 export const revalidate = 30;
+
+function parseEntryType(value?: string): HeritageEntryType | undefined {
+  if (!value) return undefined;
+  return heritageEntryTypes.includes(value as HeritageEntryType)
+    ? (value as HeritageEntryType)
+    : undefined;
+}
 
 export default async function ArchivePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; type?: string }>;
 }) {
-  const { q } = await searchParams;
-  const entries = await getHeritageEntries(q);
+  const { q, type } = await searchParams;
+  const entryType = parseEntryType(type);
+  const entries = await getHeritageEntries(q, entryType);
+  const typeLabel = entryType ? heritageLabel(entryType) : null;
 
   return (
     <div>
       <PageHeader
         eyebrow="Şop · yaşayan hafıza atlası"
-        title="Hafıza Arşivi"
-        description="Yerleri, tarihsel olayları, anlatıları ve kültürel mirası birlikte kayda geçiriyoruz."
+        title={typeLabel ? typeLabel : "Hafıza Arşivi"}
+        description={
+          typeLabel
+            ? `${typeLabel} kayıtlarını görüntülüyorsunuz. Tüm arşive dönmek için üst menüden Arşiv → Tüm arşiv’i seçin.`
+            : "Yerleri, tarihsel olayları, anlatıları ve kültürel mirası birlikte kayda geçiriyoruz."
+        }
         actions={
-          <Link href="#yeni">
-            <Button>Yeni kayıt ekle</Button>
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {entryType && (
+              <Link href="/archive">
+                <Button variant="secondary">Tüm arşiv</Button>
+              </Link>
+            )}
+            <Link href="#yeni">
+              <Button>Yeni kayıt ekle</Button>
+            </Link>
+          </div>
         }
       />
 
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div>
           <form className="mb-6 animate-fade-up">
+            {entryType && <input type="hidden" name="type" value={entryType} />}
             <input
               name="q"
               defaultValue={q ?? ""}
@@ -40,11 +63,13 @@ export default async function ArchivePage({
 
           {entries.length === 0 ? (
             <EmptyState
-              title={q ? "Sonuç bulunamadı" : "Arşiv henüz boş"}
+              title={q || entryType ? "Sonuç bulunamadı" : "Arşiv henüz boş"}
               description={
                 q
                   ? "Başka bir ad, yer veya Türkçe karşılığını deneyin."
-                  : "İlk yer, anlatı veya tarih kaydını ekleyerek ortak belleği başlatın."
+                  : entryType
+                    ? `Bu kategoride henüz kayıt yok. İlk ${typeLabel?.toLowerCase()} kaydını ekleyebilirsiniz.`
+                    : "İlk yer, anlatı veya tarih kaydını ekleyerek ortak belleği başlatın."
               }
             />
           ) : (

@@ -1,7 +1,11 @@
 import Link from "next/link";
+import { HeritageEntryCard } from "@/components/heritage-entry-card";
 import { Logo } from "@/components/logo";
 import { SetupBanner } from "@/components/setup-banner";
 import { Button } from "@/components/ui";
+import { getHeritageEntries, getVillages } from "@/lib/data";
+
+export const revalidate = 60;
 
 const memoryPaths = [
   {
@@ -53,7 +57,11 @@ const archivePrinciples = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const [villages, entries] = await Promise.all([getVillages(), getHeritageEntries()]);
+  const villagePreview = villages.slice(0, 3);
+  const entryPreview = entries.slice(0, 2);
+
   return (
     <div>
       <SetupBanner />
@@ -360,6 +368,62 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section id="kesfet" className="mt-16 scroll-mt-20 grid gap-10 border-t border-border-soft pt-10 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)]">
+        <div className="animate-fade-up">
+          <div className="mb-5 flex items-end justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-accent">Köy atlasından</p>
+              <h2 className="mt-1 text-[25px] font-semibold tracking-[-0.035em]">Canlı köyler</h2>
+            </div>
+            <Link href="/villages" className="text-[13px] font-medium text-accent">Tüm köyler →</Link>
+          </div>
+          {villagePreview.length === 0 ? (
+            <div className="rounded-[var(--radius)] border border-dashed border-border bg-bg-surface/70 px-6 py-10 text-center">
+              <p className="text-[16px] font-medium">Henüz köy kaydı yok</p>
+              <p className="mt-2 text-[14px] text-text-secondary">İlk köyü ekleyerek yer ve aile hafızasını başlat.</p>
+              <Link href="/villages#yeni" className="mt-5 inline-block"><Button>İlk köyü oluştur</Button></Link>
+            </div>
+          ) : (
+            <ul className="stagger grid gap-3 sm:grid-cols-2">
+              {villagePreview.map((village) => (
+                <li key={village.id}>
+                  <Link href={`/v/${village.slug}`} className="pressable block rounded-[var(--radius)] titanium-surface p-5">
+                    <p className="text-[17px] font-semibold tracking-[-0.02em]">{village.name}</p>
+                    {village.name_tr && <p className="mt-1 text-[12px] text-text-secondary">{village.name_tr}</p>}
+                    <p className="mt-3 line-clamp-2 text-[13px] text-text-secondary">
+                      {village.description || "Aileler ve kişiler burada toplanıyor."}
+                    </p>
+                    <p className="mt-4 text-[12px] font-medium text-text-tertiary">{village.family_count ?? 0} aile</p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="animate-fade-up">
+          <div className="mb-5 flex items-end justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-accent">Ortak arşivden</p>
+              <h2 className="mt-1 text-[25px] font-semibold tracking-[-0.035em]">Hafızadan izler</h2>
+            </div>
+            <Link href="/archive" className="text-[13px] font-medium text-accent">Arşive git →</Link>
+          </div>
+          {entryPreview.length === 0 ? (
+            <div className="rounded-[var(--radius)] border border-dashed border-border bg-bg-surface/70 px-6 py-10 text-center">
+              <p className="text-[16px] font-medium">Arşiv ilk kaydını bekliyor</p>
+              <p className="mt-2 text-[14px] text-text-secondary">Bir yer, anlatı veya kültürel öğeyi kaynağıyla ekle.</p>
+              <Link href="/archive#yeni" className="mt-5 inline-block"><Button variant="secondary">Arşive kayıt ekle</Button></Link>
+            </div>
+          ) : (
+            <ul className="stagger space-y-3">
+              {entryPreview.map((entry) => (
+                <li key={entry.id}><HeritageEntryCard entry={entry} /></li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
