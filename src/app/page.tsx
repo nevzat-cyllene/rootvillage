@@ -255,42 +255,23 @@ export default async function HomePage() {
           </p>
         </div>
 
-        <div className="mt-8 grid gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-          <article className="rounded-[24px] border border-[#8da196]/25 bg-[#edf3ef] p-6 sm:p-7">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[#557064]">Somut örnek</p>
-            <h3 className="mt-4 text-[23px] font-semibold tracking-[-0.035em]">H. Mehmet ailesinden Hesse Hecî ailesine</h3>
-            <p className="mt-4 text-[14px] leading-[1.75] text-[#52645c]">
-              H. Mehmet ailesini köy atlasına ekledin. Daha sonra Mehmet’in amcası Hesse Hecî’nin
-              ailesini de kaydettin. İki aile arasındaki bağı kişiler üzerinden kurduğunda, Şop yalnızca
-              iki ev arasında bir çizgi çekmez; bu kolun kimden ayrıldığını ve nereye uzandığını gösterir.
-            </p>
-            <div className="mt-6 flex items-center gap-2 text-[11px] font-semibold text-[#476457]">
-              <span className="rounded-full bg-white/75 px-3 py-1.5">H. Mehmet</span>
-              <span aria-hidden>⟶</span>
-              <span className="rounded-full bg-white/75 px-3 py-1.5">ortak kök</span>
-              <span aria-hidden>⟶</span>
-              <span className="rounded-full bg-white/75 px-3 py-1.5">Hesse Hecî</span>
-            </div>
-          </article>
-
-          <article className="rounded-[24px] border border-border-soft bg-bg-surface p-6 shadow-[0_15px_45px_rgba(31,42,36,0.05)] sm:p-7">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-tertiary">Haritada ne görünür?</p>
-            <ul className="mt-5 space-y-4">
-              {familyMapDetails.map((detail, index) => (
-                <li key={detail} className="flex gap-3 text-[13px] leading-[1.65] text-text-secondary">
-                  <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-border-soft bg-bg-elevated text-[9px] font-semibold text-text-tertiary">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  {detail}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-6 border-t border-border-soft pt-5 text-[13px] font-medium leading-relaxed text-text">
-              Böylece yalnızca “kim kimin akrabası?” değil; bir kolun hangi kökten, hangi tarihte ve
-              hangi coğrafyaya doğru yayıldığı da araştırılabilir.
-            </p>
-          </article>
-        </div>
+        <article className="mt-8 max-w-3xl rounded-[24px] border border-border-soft bg-bg-surface p-6 shadow-[0_15px_45px_rgba(31,42,36,0.05)] sm:p-7">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-tertiary">Haritada ne görünür?</p>
+          <ul className="mt-5 space-y-4">
+            {familyMapDetails.map((detail, index) => (
+              <li key={detail} className="flex gap-3 text-[13px] leading-[1.65] text-text-secondary">
+                <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-border-soft bg-bg-elevated text-[9px] font-semibold text-text-tertiary">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                {detail}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-6 border-t border-border-soft pt-5 text-[13px] font-medium leading-relaxed text-text">
+            Böylece yalnızca “kim kimin akrabası?” değil; bir kolun hangi kökten, hangi tarihte ve
+            hangi coğrafyaya doğru yayıldığı da araştırılabilir.
+          </p>
+        </article>
       </section>
 
       <section id="edebiyat" className="mt-16 scroll-mt-20 rounded-[26px] border border-border-soft bg-bg-elevated/65 p-5 sm:p-8">
