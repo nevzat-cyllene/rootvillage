@@ -79,8 +79,12 @@ export function FamilyTreeCanvas({
 
   /* ------------------------------------------------------- selection */
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedEmptyFamilyId, setSelectedEmptyFamilyId] = useState<string | null>(null);
   const selectedCard = selectedKey ? layout.cardByKey.get(selectedKey) ?? null : null;
   const selectedPerson = selectedCard ? layout.graph.people.get(selectedCard.personId) ?? null : null;
+  const selectedEmptyFamily = selectedEmptyFamilyId
+    ? display.families.find((f) => f.id === selectedEmptyFamilyId) ?? null
+    : null;
   const [activeFamilyId, setActiveFamilyId] = useState<string | null>(null);
 
   const [referenceId, setReferenceId] = useState<string | null>(null);
@@ -145,12 +149,21 @@ export function FamilyTreeCanvas({
   const selectPerson = (personId: string, fly = true) => {
     const key = layout.primaryCardByPerson.get(personId);
     if (!key) return;
+    setSelectedEmptyFamilyId(null);
     setSelectedKey(key);
     const card = layout.cardByKey.get(key);
     if (card) {
       setActiveFamilyId(card.familyId);
       if (fly) flyToCard(card);
     }
+  };
+
+  const selectEmptyFamily = (familyId: string) => {
+    setSelectedKey(null);
+    setSelectedEmptyFamilyId(familyId);
+    setActiveFamilyId(familyId);
+    focusFamily(familyId);
+    containerRef.current?.focus({ preventScroll: true });
   };
 
   /* ---------------------------------------------------------- editor */
@@ -349,6 +362,7 @@ export function FamilyTreeCanvas({
         }}
         onClick={() => {
           setSelectedKey(null);
+          setSelectedEmptyFamilyId(null);
           setDropMenu(null);
         }}
       >
@@ -375,7 +389,8 @@ export function FamilyTreeCanvas({
                   data-no-pan
                   onClick={(event) => {
                     event.stopPropagation();
-                    focusFamily(frame.familyId);
+                    if (frame.placeholder) selectEmptyFamily(frame.familyId);
+                    else focusFamily(frame.familyId);
                   }}
                   className="pedigree-frame-label absolute left-5 top-3 flex items-baseline gap-2 rounded-full px-3 py-1 text-left"
                 >
@@ -429,29 +444,26 @@ export function FamilyTreeCanvas({
           {/* Empty-family placeholders */}
           {layout.frames.map((frame) =>
             frame.placeholder ? (
-              <div
+              <button
                 key={`placeholder:${frame.familyId}`}
+                type="button"
                 data-no-pan
-                className="pedigree-placeholder absolute flex flex-col items-center justify-center rounded-[20px] border-2 border-dashed px-3 text-center"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  selectEmptyFamily(frame.familyId);
+                }}
+                className={cn(
+                  "pedigree-placeholder absolute flex flex-col items-center justify-center rounded-[20px] border-2 border-dashed px-3 text-center transition",
+                  selectedEmptyFamilyId === frame.familyId && "pedigree-placeholder-selected",
+                )}
                 style={{ left: frame.placeholder.x, top: frame.placeholder.y, width: 168, height: 196 }}
               >
                 <span className="text-[13px] font-semibold text-text">{frame.name} Ailesi</span>
                 <span className="mt-1 text-[11px] text-text-secondary">Henüz kişi yok</span>
-                {canEdit ? (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      editor.openFounder(frame.familyId);
-                    }}
-                    className="pressable mt-3 rounded-full bg-[#236B5B] px-3 py-1.5 text-[11px] font-semibold text-white shadow-[0_8px_24px_rgba(35,107,91,0.25)] hover:bg-[#195849]"
-                  >
-                    ＋ Kurucuyu ekle
-                  </button>
-                ) : (
-                  <span className="mt-3 text-[10px] text-text-tertiary">Katkıcılar ekleyebilir</span>
-                )}
-              </div>
+                <span className="mt-3 text-[10px] font-medium text-text-tertiary">
+                  {canEdit ? "Seç · kurucu ekle veya sil" : "Boş aile"}
+                </span>
+              </button>
             ) : null,
           )}
 
@@ -474,6 +486,7 @@ export function FamilyTreeCanvas({
                 readOnly={!editable}
                 onPointerDown={(event) => onCardPointerDown(event, card)}
                 onSelect={(key) => {
+                  setSelectedEmptyFamilyId(null);
                   setSelectedKey(key);
                   setActiveFamilyId(card.familyId);
                   containerRef.current?.focus({ preventScroll: true });
@@ -569,6 +582,32 @@ export function FamilyTreeCanvas({
         </div>
       )}
 
+      {selectedEmptyFamily && !sampleMode && (
+        <EmptyFamilyBar
+          family={selectedEmptyFamily}
+          editable={editable}
+          canRemove={editable}
+          isAdmin={isAdmin}
+          busy={editor.busy}
+          onClose={() => setSelectedEmptyFamilyId(null)}
+          onAddFounder={() => editor.openFounder(selectedEmptyFamily.id)}
+          onRemove={async (reason) => {
+            const result = await editor.removeFamily(selectedEmptyFamily.id, reason);
+            if (result === "deleted") {
+              setSelectedEmptyFamilyId(null);
+              setToast(`“${selectedEmptyFamily.name}” ailesi silindi`);
+              return null;
+            }
+            if (result === "proposed") {
+              setToast(`Aile silme önerisi gönderildi · admin onayı bekleniyor`);
+              return null;
+            }
+            setToast(result);
+            return result;
+          }}
+        />
+      )}
+
       {selectedCard && selectedPerson && !sampleMode && (
         <SelectionBar
           card={selectedCard}
@@ -650,6 +689,123 @@ function HaloButton({ label, style, onClick }: { label: string; style: React.CSS
     >
       {label}
     </button>
+  );
+}
+
+function EmptyFamilyBar({
+  family,
+  editable,
+  canRemove,
+  isAdmin,
+  busy,
+  onClose,
+  onAddFounder,
+  onRemove,
+}: {
+  family: Family;
+  editable: boolean;
+  canRemove: boolean;
+  isAdmin: boolean;
+  busy: boolean;
+  onClose: () => void;
+  onAddFounder: () => void;
+  onRemove: (reason?: string) => Promise<string | null>;
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [reason, setReason] = useState("");
+  const [removing, setRemoving] = useState(false);
+
+  useEffect(() => {
+    setConfirmDelete(false);
+    setReason("");
+  }, [family.id]);
+
+  async function confirm() {
+    setRemoving(true);
+    const err = await onRemove(reason);
+    setRemoving(false);
+    if (!err) setConfirmDelete(false);
+  }
+
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4">
+      <div className="pointer-events-auto kinship-sheet-enter w-full max-w-2xl rounded-[22px] border border-white/80 bg-white/95 p-3 shadow-[0_22px_60px_rgba(20,40,60,0.22)] backdrop-blur-xl">
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-[14px] border border-dashed border-border-soft bg-bg-elevated text-[15px] font-semibold text-text-secondary">
+            {family.name.slice(0, 1).toLocaleUpperCase("tr")}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[14px] font-semibold tracking-[-0.02em]">{family.name} Ailesi</p>
+            <p className="truncate text-[11px] text-text-secondary">Henüz kişi yok · boş ocak</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-bg-elevated text-text-secondary hover:text-text"
+            aria-label="Seçimi bırak"
+          >
+            ×
+          </button>
+        </div>
+        {editable ? (
+          <>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={onAddFounder}
+                className="pressable rounded-full border border-[#9FC8BD] bg-[#EFF8F5] px-3 py-1.5 text-[11px] font-semibold text-[#236B5B] hover:bg-[#DFF1EB]"
+              >
+                ＋ Kurucu ekle
+              </button>
+              {canRemove && !confirmDelete && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  className="pressable rounded-full border border-border-soft bg-white px-3 py-1.5 text-[11px] font-semibold text-text-secondary hover:border-border hover:text-text"
+                >
+                  Sil
+                </button>
+              )}
+            </div>
+            {canRemove && confirmDelete && (
+              <div className="mt-2.5 flex flex-col gap-2 rounded-[14px] border border-border-soft bg-bg-elevated/80 px-3 py-2.5">
+                <p className="text-[12px] leading-snug text-text-secondary">
+                  {isAdmin
+                    ? `“${family.name}” ailesi kalıcı silinecek.`
+                    : `“${family.name}” için silme önerisi admin onayına gider.`}
+                </p>
+                {!isAdmin && (
+                  <input
+                    value={reason}
+                    onChange={(event) => setReason(event.target.value)}
+                    placeholder="Neden silinmeli? (isteğe bağlı)"
+                    className="w-full rounded-[12px] border border-border-soft bg-white px-3 py-2 text-[13px] outline-none placeholder:text-text-tertiary focus:border-accent/40 focus:ring-2 focus:ring-accent/15"
+                  />
+                )}
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    disabled={busy || removing}
+                    onClick={() => void confirm()}
+                    className="pressable rounded-full bg-text px-3.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#2d2d2f] disabled:opacity-60"
+                  >
+                    {removing || busy ? "İşleniyor…" : isAdmin ? "Kalıcı sil" : "Öneri gönder"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={removing}
+                    onClick={() => setConfirmDelete(false)}
+                    className="pressable rounded-full border border-border-soft bg-white px-3 py-1.5 text-[11px] font-semibold text-text-secondary hover:text-text"
+                  >
+                    Vazgeç
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : null}
+      </div>
+    </div>
   );
 }
 

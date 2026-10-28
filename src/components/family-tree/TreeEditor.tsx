@@ -16,6 +16,7 @@ import { uploadPersonAvatar } from "@/lib/avatar-upload";
 import { partnersOf, type KinGraph } from "@/lib/pedigree/graph";
 import {
   deleteRelation,
+  hardDeleteFamily,
   hardDeletePerson,
   insertPerson,
   insertRelations,
@@ -40,6 +41,8 @@ export type TreeEditor = {
   openConnections: (personId: string) => void;
   /** Admin: hard-delete. Contributor: edit_proposals delete request. */
   removePerson: (personId: string, reason?: string) => Promise<"deleted" | "proposed" | string>;
+  /** Admin: hard-delete empty/any family. Contributor: proposal. */
+  removeFamily: (familyId: string, reason?: string) => Promise<"deleted" | "proposed" | string>;
   linkExisting: (role: AddRole, focusId: string, otherId: string, coParentId?: string | null) => Promise<string | null>;
   loadSample: () => Promise<void>;
   /** Sheets / dialogs; render once inside the canvas. */
@@ -375,6 +378,56 @@ export function useTreeEditor({
     [ensureUser, people, profile?.role, router, setFamilies, setPeople, setRelations],
   );
 
+  const removeFamily = useCallback(
+    async (familyId: string, reason?: string): Promise<"deleted" | "proposed" | string> => {
+      const session = await ensureUser();
+      if (!session) return "Giriş gerekli";
+      setBusy(true);
+      setError(null);
+      const family = families.find((f) => f.id === familyId);
+      const isAdmin = profile?.role === "admin";
+
+      if (isAdmin) {
+        const deleteError = await hardDeleteFamily(session.supabase, familyId);
+        if (deleteError) {
+          setBusy(false);
+          setError(deleteError);
+          return deleteError;
+        }
+        const removedPeople = new Set(
+          people.filter((p) => p.family_id === familyId).map((p) => p.id),
+        );
+        setFamilies((prev) => prev.filter((f) => f.id !== familyId));
+        setPeople((prev) => prev.filter((p) => p.family_id !== familyId));
+        setRelations((prev) =>
+          prev.filter(
+            (r) => !removedPeople.has(r.person_id) && !removedPeople.has(r.related_person_id),
+          ),
+        );
+        setBusy(false);
+        router.refresh();
+        return "deleted";
+      }
+
+      const { error: proposalError } = await session.supabase.from("edit_proposals").insert({
+        target_type: "family",
+        target_id: familyId,
+        action: "delete",
+        payload: family ? { name: family.name } : null,
+        reason: reason?.trim() || (family ? `${family.name} ailesi silme önerisi` : "Aile silme önerisi"),
+        proposed_by: session.user.id,
+      });
+      setBusy(false);
+      if (proposalError) {
+        setError(proposalError.message);
+        return proposalError.message;
+      }
+      router.refresh();
+      return "proposed";
+    },
+    [ensureUser, families, people, profile?.role, router, setFamilies, setPeople, setRelations],
+  );
+
   const loadSample = useCallback(async () => {
     const session = await ensureUser();
     if (!session) return;
@@ -510,6 +563,7 @@ export function useTreeEditor({
     openEdit,
     openConnections,
     removePerson,
+    removeFamily,
     linkExisting,
     loadSample,
     sheets,

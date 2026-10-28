@@ -392,6 +392,11 @@ select {
   border-color: rgba(93, 116, 137, 0.34);
   background: rgba(255, 255, 255, 0.55);
 }
+.pedigree-placeholder-selected {
+  border-color: rgba(35, 107, 91, 0.55);
+  background: rgba(239, 248, 245, 0.92);
+  box-shadow: 0 0 0 6px rgba(35, 107, 91, 0.08);
+}
 
 .pedigree-halo-btn {
   animation: kinship-pop 0.35s cubic-bezier(0.2, 0.85, 0.25, 1) both;

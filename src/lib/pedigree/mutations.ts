@@ -182,6 +182,12 @@ export async function hardDeletePerson(supabase: WriteClient, personId: string):
   return error?.message ?? null;
 }
 
+/** Permanent family delete — cascades people via FK. Admin-only at RLS. */
+export async function hardDeleteFamily(supabase: WriteClient, familyId: string): Promise<string | null> {
+  const { error } = await supabase.from("families").delete().eq("id", familyId);
+  return error?.message ?? null;
+}
+
 /** @deprecated use hardDeletePerson — kept for rollback paths that need a quick undo insert failure cleanup */
 export async function softDeletePerson(supabase: WriteClient, personId: string): Promise<string | null> {
   return hardDeletePerson(supabase, personId);
