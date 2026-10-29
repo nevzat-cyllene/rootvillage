@@ -18,6 +18,8 @@ declare global {
 /** v2 — old keys permanently blocked phones after one dismiss/PWA open. */
 const DISMISS_KEY = "sop-install-dismissed-v2";
 const DISMISS_DAYS = 3;
+/** Soft delay before showing invite (~market soft-prompt range). */
+const SHOW_AFTER_MS = 6_500;
 
 function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
@@ -132,7 +134,22 @@ export function InstallPrompt() {
       return;
     }
 
-    setVisible(true);
+    let cancelled = false;
+    let relatedAppsInstalled = false;
+    const timers: number[] = [];
+
+    const showInvite = () => {
+      if (cancelled || relatedAppsInstalled || isStandalone()) return;
+      if (!forced && wasDismissedRecently()) return;
+      setVisible(true);
+    };
+
+    if (forced) {
+      showInvite();
+    } else {
+      timers.push(window.setTimeout(showInvite, SHOW_AFTER_MS) as unknown as number);
+    }
+
     if (window.__sopInstallPrompt) {
       setDeferred(window.__sopInstallPrompt);
       setShowInstallHelp(false);
@@ -168,7 +185,10 @@ export function InstallPrompt() {
       void nav
         .getInstalledRelatedApps()
         .then((apps) => {
-          if (apps?.length) setVisible(false);
+          if (apps?.length) {
+            relatedAppsInstalled = true;
+            setVisible(false);
+          }
         })
         .catch(() => {});
     }
@@ -178,9 +198,11 @@ export function InstallPrompt() {
     }
 
     return () => {
+      cancelled = true;
       window.removeEventListener("beforeinstallprompt", onBip);
       window.removeEventListener("sop:install-ready", onEarlyPrompt);
       window.removeEventListener("appinstalled", onInstalled);
+      for (const id of timers) window.clearTimeout(id);
     };
   }, []);
 
