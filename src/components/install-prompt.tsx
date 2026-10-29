@@ -15,15 +15,9 @@ declare global {
   }
 }
 
-const DISMISS_KEY = "sop-install-dismissed-at";
-const INSTALLED_KEY = "sop-pwa-installed";
-const DISMISS_DAYS = 14;
-/** Soft invite when beforeinstallprompt never fires (common on mobile). */
-const ENGAGE_MS = 2_500;
-/** Avoid an instant flash when BIP is ready early. */
-const MIN_DELAY_MS = 1_500;
-/** Scroll past this → show sooner (after MIN_DELAY_MS). */
-const SCROLL_ENGAGE_PX = 180;
+/** v2 — old keys permanently blocked phones after one dismiss/PWA open. */
+const DISMISS_KEY = "sop-install-dismissed-v2";
+const DISMISS_DAYS = 3;
 
 function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
@@ -36,17 +30,24 @@ function isStandalone(): boolean {
   );
 }
 
-/** Phone / tablet only — never show on desktop web. */
+/** Phone / tablet only — never show on wide desktop web. */
 function isMobileClient(): boolean {
   if (typeof window === "undefined") return false;
   const ua = window.navigator.userAgent.toLowerCase();
   if (/android|iphone|ipad|ipod|webos|blackberry|iemobile|opera mini|mobile/.test(ua)) {
     return true;
   }
-  return (
+  if (
     window.navigator.platform === "MacIntel" &&
     (window.navigator.maxTouchPoints ?? 0) > 1
-  );
+  ) {
+    return true;
+  }
+  try {
+    return window.matchMedia("(max-width: 900px) and (pointer: coarse)").matches;
+  } catch {
+    return false;
+  }
 }
 
 function isForcedInstall(): boolean {
@@ -78,22 +79,6 @@ function markDismissed() {
   }
 }
 
-function markInstalled() {
-  try {
-    localStorage.setItem(INSTALLED_KEY, "1");
-  } catch {
-    // ignore
-  }
-}
-
-function wasInstalledBefore(): boolean {
-  try {
-    return localStorage.getItem(INSTALLED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
 function detectIos(): boolean {
   if (typeof window === "undefined") return false;
   const ua = window.navigator.userAgent.toLowerCase();
@@ -118,6 +103,15 @@ export function InstallPrompt() {
     const forced = isForcedInstall();
     const mobile = isMobileClient();
     const ios = detectIos();
+    const dismissed = wasDismissedRecently();
+
+    try {
+      localStorage.removeItem("sop-pwa-installed");
+      localStorage.removeItem("sop-install-dismissed-at");
+    } catch {
+      // ignore
+    }
+
     setIsIos(ios);
     if (ios) setShowInstallHelp(true);
 
@@ -125,7 +119,6 @@ export function InstallPrompt() {
     document.documentElement.setAttribute("data-show-install", "");
 
     if (standalone) {
-      markInstalled();
       setVisible(false);
       return;
     }
@@ -135,57 +128,19 @@ export function InstallPrompt() {
       return;
     }
 
-    if (!forced && wasInstalledBefore()) {
-      setVisible(false);
+    if (dismissed && !forced) {
       return;
     }
 
-    if (forced) {
-      setVisible(true);
-      if (window.__sopInstallPrompt) {
-        setDeferred(window.__sopInstallPrompt);
-        setShowInstallHelp(false);
-      }
-    } else if (wasDismissedRecently()) {
-      return;
+    setVisible(true);
+    if (window.__sopInstallPrompt) {
+      setDeferred(window.__sopInstallPrompt);
+      setShowInstallHelp(false);
     }
-
-    let shown = forced;
-    const startedAt = Date.now();
-    const timers: number[] = [];
-
-    const reveal = () => {
-      if (shown) return;
-      if (isStandalone() || wasInstalledBefore()) return;
-      if (!forced && wasDismissedRecently()) return;
-      if (!forced && !isMobileClient()) return;
-      shown = true;
-      setVisible(true);
-    };
-
-    const maybeReveal = (reason: "bip" | "timer" | "scroll") => {
-      if (shown) return;
-      const elapsed = Date.now() - startedAt;
-      if (reason === "bip") {
-        if (elapsed >= MIN_DELAY_MS) reveal();
-        else {
-          timers.push(
-            window.setTimeout(reveal, MIN_DELAY_MS - elapsed) as unknown as number,
-          );
-        }
-        return;
-      }
-      if (reason === "scroll" && elapsed >= MIN_DELAY_MS) {
-        reveal();
-        return;
-      }
-      if (reason === "timer") reveal();
-    };
 
     const acceptPrompt = (prompt: BeforeInstallPromptEvent) => {
       setDeferred(prompt);
       setShowInstallHelp(false);
-      if (!forced) maybeReveal("bip");
     };
 
     const onBip = (e: Event) => {
@@ -197,18 +152,13 @@ export function InstallPrompt() {
       if (window.__sopInstallPrompt) acceptPrompt(window.__sopInstallPrompt);
     };
     const onInstalled = () => {
-      markInstalled();
       setVisible(false);
       markDismissed();
-    };
-    const onScroll = () => {
-      if (window.scrollY >= SCROLL_ENGAGE_PX) maybeReveal("scroll");
     };
 
     window.addEventListener("beforeinstallprompt", onBip);
     window.addEventListener("sop:install-ready", onEarlyPrompt);
     window.addEventListener("appinstalled", onInstalled);
-    window.addEventListener("scroll", onScroll, { passive: true });
     onEarlyPrompt();
 
     const nav = navigator as Navigator & {
@@ -218,17 +168,9 @@ export function InstallPrompt() {
       void nav
         .getInstalledRelatedApps()
         .then((apps) => {
-          if (apps?.length) {
-            markInstalled();
-            setVisible(false);
-            shown = true;
-          }
+          if (apps?.length) setVisible(false);
         })
         .catch(() => {});
-    }
-
-    if (!forced) {
-      timers.push(window.setTimeout(() => maybeReveal("timer"), ENGAGE_MS) as unknown as number);
     }
 
     if ("serviceWorker" in navigator) {
@@ -239,8 +181,6 @@ export function InstallPrompt() {
       window.removeEventListener("beforeinstallprompt", onBip);
       window.removeEventListener("sop:install-ready", onEarlyPrompt);
       window.removeEventListener("appinstalled", onInstalled);
-      window.removeEventListener("scroll", onScroll);
-      for (const id of timers) window.clearTimeout(id);
     };
   }, []);
 
@@ -267,7 +207,6 @@ export function InstallPrompt() {
       await deferred.prompt();
       const choice = await deferred.userChoice;
       if (choice.outcome === "accepted") {
-        markInstalled();
         setVisible(false);
         markDismissed();
       }
