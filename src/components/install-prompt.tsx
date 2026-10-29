@@ -18,12 +18,12 @@ declare global {
 const DISMISS_KEY = "sop-install-dismissed-at";
 const INSTALLED_KEY = "sop-pwa-installed";
 const DISMISS_DAYS = 14;
-/** Soft engagement wait before soft-prompt (no BIP). */
-const ENGAGE_MS = 25_000;
-/** Even if BIP is ready early, never flash the banner in the first seconds. */
-const MIN_DELAY_MS = 8_000;
-/** Scroll past this → engaged enough to show (after MIN_DELAY_MS). */
-const SCROLL_ENGAGE_PX = 480;
+/** Soft invite when beforeinstallprompt never fires (common on mobile). */
+const ENGAGE_MS = 2_500;
+/** Avoid an instant flash when BIP is ready early. */
+const MIN_DELAY_MS = 1_500;
+/** Scroll past this → show sooner (after MIN_DELAY_MS). */
+const SCROLL_ENGAGE_PX = 180;
 
 function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
@@ -36,14 +36,13 @@ function isStandalone(): boolean {
   );
 }
 
-/** Phone / tablet only — never show the install invite on desktop web. */
+/** Phone / tablet only — never show on desktop web. */
 function isMobileClient(): boolean {
   if (typeof window === "undefined") return false;
   const ua = window.navigator.userAgent.toLowerCase();
   if (/android|iphone|ipad|ipod|webos|blackberry|iemobile|opera mini|mobile/.test(ua)) {
     return true;
   }
-  // iPadOS desktop-UA spoof: touch Mac.
   return (
     window.navigator.platform === "MacIntel" &&
     (window.navigator.maxTouchPoints ?? 0) > 1
@@ -125,14 +124,12 @@ export function InstallPrompt() {
     document.documentElement.toggleAttribute("data-force-install", forced);
     document.documentElement.setAttribute("data-show-install", "");
 
-    // Opened from installed PWA → remember and never invite again on this device.
     if (standalone) {
       markInstalled();
       setVisible(false);
       return;
     }
 
-    // Desktop web: never show (except explicit ?install=1 test).
     if (!mobile && !forced) {
       setVisible(false);
       return;
@@ -143,7 +140,6 @@ export function InstallPrompt() {
       return;
     }
 
-    // Test / forced path only — skip engagement delay.
     if (forced) {
       setVisible(true);
       if (window.__sopInstallPrompt) {
@@ -171,7 +167,6 @@ export function InstallPrompt() {
       if (shown) return;
       const elapsed = Date.now() - startedAt;
       if (reason === "bip") {
-        // Chrome already applied engagement heuristics; still avoid instant flash.
         if (elapsed >= MIN_DELAY_MS) reveal();
         else {
           timers.push(
@@ -216,21 +211,22 @@ export function InstallPrompt() {
     window.addEventListener("scroll", onScroll, { passive: true });
     onEarlyPrompt();
 
-    // Chromium: related apps API — hide if already installed as PWA.
     const nav = navigator as Navigator & {
       getInstalledRelatedApps?: () => Promise<unknown[]>;
     };
     if (typeof nav.getInstalledRelatedApps === "function") {
-      void nav.getInstalledRelatedApps().then((apps) => {
-        if (apps?.length) {
-          markInstalled();
-          setVisible(false);
-          shown = true;
-        }
-      }).catch(() => {});
+      void nav
+        .getInstalledRelatedApps()
+        .then((apps) => {
+          if (apps?.length) {
+            markInstalled();
+            setVisible(false);
+            shown = true;
+          }
+        })
+        .catch(() => {});
     }
 
-    // Soft invite only on mobile when not already installed (Safari / no BIP).
     if (!forced) {
       timers.push(window.setTimeout(() => maybeReveal("timer"), ENGAGE_MS) as unknown as number);
     }
